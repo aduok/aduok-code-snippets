@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Scorpion IK Cursor</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; cursor:none; }
+body { background:#000; overflow:hidden; }
+canvas { display:block; }
+</style>
+</head>
+<body>
+<script>
+// ─── Input ───────────────────────────────────────────────────────────────────
+var Input = { keys:[], mouse:{ left:false, x:0, y:0 } };
+for(var i=0;i<230;i++) Input.keys.push(false);
+document.addEventListener('keydown',e=>Input.keys[e.keyCode]=true);
+document.addEventListener('keyup',  e=>Input.keys[e.keyCode]=false);
+document.addEventListener('mousedown',e=>{ if(e.button===0) Input.mouse.left=true; });
+document.addEventListener('mouseup',  e=>{ if(e.button===0) Input.mouse.left=false; });
+document.addEventListener('mousemove',e=>{ Input.mouse.x=e.clientX; Input.mouse.y=e.clientY; });
+
+// ─── Canvas ──────────────────────────────────────────────────────────────────
+var canvas = document.createElement('canvas');
+document.body.appendChild(canvas);
+canvas.width  = window.innerWidth;
+canvas.height = window.innerHeight;
+canvas.style.cssText = 'position:absolute;left:0;top:0;';
+document.body.style.overflow='hidden';
+var ctx = canvas.getContext('2d');
+window.addEventListener('resize',()=>{ canvas.width=window.innerWidth; canvas.height=window.innerHeight; });
+
+// ─── Segment class ───────────────────────────────────────────────────────────
+class Segment {
+  constructor(parent, size, angle, range, stiffness) {
+    this.isSegment = true;
+    this.parent = parent;
+    if(typeof parent.children==='object') parent.children.push(this);
+    this.children = [];
+    this.size = size;
+    this.relAngle = angle;
+    this.defAngle = angle;
+    this.absAngle = parent.absAngle + angle;
+    this.range = range;
+    this.stiffness = stiffness;
+    this.updateRelative(false, true);
+  }
+  updateRelative(iter, flex) {
+    this.relAngle -= 2*Math.PI*Math.floor((this.relAngle-this.defAngle)/2/Math.PI+0.5);
+    if(flex){
+      this.relAngle = Math.min(
+        this.defAngle+this.range/2,
+        Math.max(this.defAngle-this.range/2,
+          (this.relAngle-this.defAngle)/this.stiffness+this.defAngle));
+    }
+    this.absAngle = this.parent.absAngle + this.relAngle;
+    this.x = this.parent.x + Math.cos(this.absAngle)*this.size;
+    this.y = this.parent.y + Math.sin(this.absAngle)*this.size;
+    if(iter) this.children.forEach(c=>c.updateRelative(iter,flex));
+  }
+  follow(iter) {
+    var px=this.parent.x, py=this.parent.y;
+    var d=Math.hypot(this.x-px,this.y-py);
+    this.x = px+this.size*(this.x-px)/d;
+    this.y = py+this.size*(this.y-py)/d;
+    this.absAngle = Math.atan2(this.y-py, this.x-px);
+    this.relAngle = this.absAngle - this.parent.absAngle;
+    this.updateRelative(false, true);
+    if(iter) this.children.forEach(c=>c.follow(true));
+  }
+}
+
+// ─── LimbSystem ──────────────────────────────────────────────────────────────
+class LimbSystem {
+  constructor(end, length, speed, creature) {
+    this.end=end; this.length=Math.max(1,length); this.creature=creature; this.speed=speed;
+    creature.systems.push(this);
+    this.nodes=[];
+    var node=end;
+    for(var i=0;i<length;i++){
+      this.nodes.unshift(node);
+      node=node.parent;
+      if(!node.isSegment){ this.length=i+1; break; }
+    }
+    this.hip=this.nodes[0].parent;
+  }
+  moveTo(x,y){
+    this.nodes[0].updateRelative(true,true);
+    var dist=Math.hypot(x-this.end.x, y-this.end.y);
+    var len=Math.max(0,dist-this.speed);
+    for(var i=this.nodes.length-1;i>=0;i--){
+      var n=this.nodes[i];
+      var ang=Math.atan2(n.y-y,n.x-x);
+      n.x=x+len*Math.cos(ang); n.y=y+len*Math.sin(ang);
+      x=n.x; y=n.y; len=n.size;
+    }
+    for(var i=0;i<this.nodes.length;i++){
+      var n=this.nodes[i];
+      n.absAngle=Math.atan2(n.y-n.parent.y, n.x-n.parent.x);
+      n.relAngle=n.absAngle-n.parent.absAngle;
+      n.children.forEach(c=>{ if(!this.nodes.includes(c)) c.updateRelative(true,false); });
+    }
+  }
+}
+
+// ─── LegSystem ───────────────────────────────────────────────────────────────
+class LegSystem extends LimbSystem {
+  constructor(end, length, speed, creature) {
+    super(end,length,speed,creature);
+    this.goalX=end.x; this.goalY=end.y;
+    this.step=0; this.forwardness=0;
+    this.reach=0.9*Math.hypot(this.end.x-this.hip.x, this.end.y-this.hip.y);
+    var relAngle=this.creature.absAngle-Math.atan2(this.end.y-this.hip.y,this.end.x-this.hip.x);
+    relAngle-=2*Math.PI*Math.floor(relAngle/2/Math.PI+0.5);
+    this.swing=-relAngle+(2*(relAngle<0)-1)*Math.PI/2;
+    this.swingOffset=this.creature.absAngle-this.hip.absAngle;
+  }
+  update(){
+    this.moveTo(this.goalX,this.goalY);
+    if(this.step===0){
+      var dist=Math.hypot(this.end.x-this.goalX, this.end.y-this.goalY);
+      if(dist>1){
+        this.step=1;
+        this.goalX=this.hip.x+this.reach*Math.cos(this.swing+this.hip.absAngle+this.swingOffset)+(2*Math.random()-1)*this.reach/2;
+        this.goalY=this.hip.y+this.reach*Math.sin(this.swing+this.hip.absAngle+this.swingOffset)+(2*Math.random()-1)*this.reach/2;
+      }
+    } else {
+      var theta=Math.atan2(this.end.y-this.hip.y,this.end.x-this.hip.x)-this.hip.absAngle;
+      var dist=Math.hypot(this.end.x-this.hip.x, this.end.y-this.hip.y);
+      var fw2=dist*Math.cos(theta);
+      var dF=this.forwardness-fw2;
+      this.forwardness=fw2;
+      if(dF*dF<1){ this.step=0; this.goalX=this.hip.x+(this.end.x-this.hip.x); this.goalY=this.hip.y+(this.end.y-this.hip.y); }
+    }
+  }
+}
+
+// ─── Creature ────────────────────────────────────────────────────────────────
+class Creature {
+  constructor(x,y,angle,fAccel,fFric,fRes,fThresh,rAccel,rFric,rRes,rThresh){
+    this.x=x; this.y=y; this.absAngle=angle;
+    this.fSpeed=0; this.fAccel=fAccel; this.fFric=fFric; this.fRes=fRes; this.fThresh=fThresh;
+    this.rSpeed=0; this.rAccel=rAccel; this.rFric=rFric; this.rRes=rRes; this.rThresh=rThresh;
+    this.children=[]; this.systems=[];
+  }
+  follow(x,y){
+    var dist=Math.hypot(this.x-x, this.y-y);
+    var angle=Math.atan2(y-this.y, x-this.x);
+    var accel=this.fAccel;
+    if(this.systems.length>0){
+      var sum=this.systems.reduce((s,sys)=>s+(sys.step===0?1:0),0);
+      accel*=sum/this.systems.length;
+    }
+    this.fSpeed+=accel*(dist>this.fThresh);
+    this.fSpeed*=1-this.fRes;
+    this.speed=Math.max(0,this.fSpeed-this.fFric);
+    var dif=this.absAngle-angle;
+    dif-=2*Math.PI*Math.floor(dif/(2*Math.PI)+0.5);
+    if(Math.abs(dif)>this.rThresh && dist>this.fThresh)
+      this.rSpeed-=this.rAccel*(2*(dif>0)-1);
+    this.rSpeed*=1-this.rRes;
+    if(Math.abs(this.rSpeed)>this.rFric) this.rSpeed-=this.rFric*(2*(this.rSpeed>0)-1);
+    else this.rSpeed=0;
+    this.absAngle+=this.rSpeed;
+    this.absAngle-=2*Math.PI*Math.floor(this.absAngle/(2*Math.PI)+0.5);
+    this.x+=this.speed*Math.cos(this.absAngle);
+    this.y+=this.speed*Math.sin(this.absAngle);
+    this.absAngle+=Math.PI;
+    this.children.forEach(c=>c.follow(true));
+    this.systems.forEach(s=>s.update());
+    this.absAngle-=Math.PI;
+  }
+}
+
+// ─── Drawing helpers ─────────────────────────────────────────────────────────
+function drawSegmentLine(seg, width, color) {
+  ctx.save();
+  ctx.strokeStyle = color || 'rgba(200,160,50,0.85)';
+  ctx.lineWidth = width || 1;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(seg.parent.x, seg.parent.y);
+  ctx.lineTo(seg.x, seg.y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawOval(x, y, rx, ry, angle, color, fill) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.strokeStyle = color || 'rgba(200,160,50,0.9)';
+  ctx.fillStyle   = fill  || 'rgba(200,160,50,0.08)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ─── Build Scorpion ──────────────────────────────────────────────────────────
+var S = 7.5; // global scale
+
+var scorpion = new Creature(
+  window.innerWidth/2, window.innerHeight/2, 0,
+  S*10, S*2.5, 0.5, S*5,
+  0.5, 0.08, 0.5, 0.25
+);
+
+// ── Metasoma (abdomen / tail curl) ──
+// 5 broad body segments
+var spine = scorpion;
+var bodySegs = [];
+for(var i=0;i<5;i++){
+  spine = new Segment(spine, S*5, 0, Math.PI*0.55, 1.3);
+  bodySegs.push(spine);
+}
+
+// ── Tail segments that curl up ──
+var tailSegs = [];
+var tailAngles = [0.25, 0.35, 0.45, 0.55, 0.65, 0.5, 0.3]; // progressive curl
+for(var i=0;i<7;i++){
+  spine = new Segment(spine, S*4, tailAngles[i], Math.PI*0.7, 1.0);
+  tailSegs.push(spine);
+}
+// Stinger tip
+var stingerSeg = new Segment(spine, S*5, -0.3, Math.PI*0.6, 1.0);
+var stingerTip = new Segment(stingerSeg, S*3, -0.5, Math.PI*0.4, 1.0);
+
+// ── Head / cephalothorax ──
+var head = new Segment(scorpion, S*6, 0, Math.PI*0.3, 1.5);
+var headFwd = new Segment(head, S*4, 0, Math.PI*0.3, 1.5);
+
+// ── Pincers (chelae) - left & right ──
+function makePincer(parent, side) { // side: +1 right, -1 left
+  var arm1 = new Segment(parent, S*7, side*0.5, Math.PI*0.6, 1.2);
+  var arm2 = new Segment(arm1,   S*6, side*0.3, Math.PI*0.5, 1.2);
+  // two fingers
+  var f1 = new Segment(arm2, S*5,  side*0.35, Math.PI*0.4, 1.2);
+  var f2 = new Segment(arm2, S*5, -side*0.1,  Math.PI*0.4, 1.2);
+  return { arm1, arm2, f1, f2 };
+}
+var pincerL = makePincer(headFwd,  1);
+var pincerR = makePincer(headFwd, -1);
+
+// ── Walking legs - 4 pairs ──
+var legPairs = [];
+var legBodyIdx = [0, 1, 3, 4]; // which body segment
+
+for(var pair=0;pair<4;pair++){
+  var attach = bodySegs[legBodyIdx[pair]];
+  var pairData = [];
+  for(var side=-1;side<=1;side+=2){
+    var hip  = new Segment(attach, S*6,  side*1.3, 0.3, 3.0);
+    var thigh= new Segment(hip,    S*7, -side*0.9, Math.PI*0.8, 1.1);
+    var shin = new Segment(thigh,  S*7,  side*1.2, Math.PI*0.9, 1.1);
+    var foot = new Segment(shin,   S*4,  side*0.4, Math.PI*0.5, 1.2);
+    var legSys = new LegSystem(foot, 4, S*15, scorpion);
+    pairData.push({ hip, thigh, shin, foot, sys:legSys });
+  }
+  legPairs.push(pairData);
+}
+
+// ─── Strike state ────────────────────────────────────────────────────────────
+var striking = false;
+var strikeTimer = 0;
+document.addEventListener('click', ()=>{
+  striking = true; strikeTimer = 0;
+});
+
+// ─── Render ──────────────────────────────────────────────────────────────────
+function drawAll() {
+  // amber glow filter
+  ctx.shadowBlur = 8;
+  ctx.shadowColor = 'rgba(210,150,30,0.4)';
+
+  // ── Tail ──
+  for(var i=0;i<tailSegs.length;i++){
+    var t=tailSegs[i];
+    var taper = 1 - i/tailSegs.length;
+    drawSegmentLine(t, S*(1.2+taper*1.5), `rgba(200,155,45,${0.55+taper*0.3})`);
+    // segment joint circles
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, S*(0.5+taper*0.8), 0, Math.PI*2);
+    ctx.fillStyle=`rgba(200,155,45,${0.12+taper*0.1})`;
+    ctx.fill();
+    ctx.strokeStyle=`rgba(200,155,45,${0.4+taper*0.2})`;
+    ctx.lineWidth=0.7;
+    ctx.stroke();
+  }
+  // stinger
+  ctx.lineWidth=1.8;
+  ctx.strokeStyle='rgba(220,180,50,0.9)';
+  ctx.beginPath();
+  ctx.moveTo(stingerSeg.parent.x, stingerSeg.parent.y);
+  ctx.lineTo(stingerSeg.x, stingerSeg.y);
+  ctx.lineTo(stingerTip.x, stingerTip.y);
+  ctx.stroke();
+  // stinger tip glow
+  var grd = ctx.createRadialGradient(stingerTip.x,stingerTip.y,0, stingerTip.x,stingerTip.y,S*4);
+  grd.addColorStop(0, striking && strikeTimer<15 ? 'rgba(100,255,80,0.9)' : 'rgba(255,220,60,0.9)');
+  grd.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.beginPath();
+  ctx.arc(stingerTip.x, stingerTip.y, S*4, 0, Math.PI*2);
+  ctx.fillStyle = grd;
+  ctx.fill();
+  // solid tip dot
+  ctx.beginPath();
+  ctx.arc(stingerTip.x, stingerTip.y, S*1.5, 0, Math.PI*2);
+  ctx.fillStyle = striking && strikeTimer<15 ? 'rgba(80,255,50,1)' : 'rgba(255,230,60,1)';
+  ctx.fill();
+
+  // ── Body segments ──
+  for(var i=0;i<bodySegs.length;i++){
+    var b=bodySegs[i];
+    var w = S*(1.8 + (2-Math.abs(i-2))*0.8);
+    drawSegmentLine(b, w*1.5, `rgba(200,155,45,0.75)`);
+    drawOval(b.x, b.y, w, w*0.65, b.absAngle, 'rgba(200,155,45,0.6)', 'rgba(200,155,45,0.07)');
+  }
+  // Creature center
+  drawOval(scorpion.x, scorpion.y, S*4.5, S*3.5, scorpion.absAngle+Math.PI,
+    'rgba(200,155,45,0.8)', 'rgba(200,155,45,0.12)');
+
+  // ── Head ──
+  drawSegmentLine(head, S*4, 'rgba(210,165,55,0.85)');
+  drawOval(head.x, head.y, S*5, S*3.5, head.absAngle, 'rgba(210,165,55,0.85)', 'rgba(210,165,55,0.15)');
+  drawSegmentLine(headFwd, S*3, 'rgba(210,165,55,0.8)');
+  // Eyes
+  var ex=headFwd.x, ey=headFwd.y, ea=headFwd.absAngle;
+  for(var es=-1;es<=1;es+=2){
+    var eyeX = ex + Math.cos(ea+es*Math.PI/2)*S*2;
+    var eyeY = ey + Math.sin(ea+es*Math.PI/2)*S*2;
+    ctx.beginPath(); ctx.arc(eyeX, eyeY, S*1.5, 0, Math.PI*2);
+    ctx.fillStyle='rgba(255,220,50,0.95)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(eyeX, eyeY, S*2.8, 0, Math.PI*2);
+    ctx.fillStyle='rgba(255,200,30,0.15)'; ctx.fill();
+  }
+
+  // ── Pincers ──
+  function drawPincer(p){
+    drawSegmentLine(p.arm1, S*1.8, 'rgba(195,150,40,0.8)');
+    drawSegmentLine(p.arm2, S*1.5, 'rgba(195,150,40,0.8)');
+    drawSegmentLine(p.f1,   S*1.2, 'rgba(210,165,50,0.85)');
+    drawSegmentLine(p.f2,   S*1.2, 'rgba(210,165,50,0.85)');
+    // knuckle joint
+    ctx.beginPath(); ctx.arc(p.arm2.x, p.arm2.y, S*1.8, 0, Math.PI*2);
+    ctx.fillStyle='rgba(200,155,45,0.15)'; ctx.fill();
+    ctx.strokeStyle='rgba(200,155,45,0.5)'; ctx.lineWidth=0.7; ctx.stroke();
+  }
+  drawPincer(pincerL);
+  drawPincer(pincerR);
+
+  // ── Legs ──
+  legPairs.forEach(pair=>{
+    pair.forEach(leg=>{
+      ctx.lineWidth=S*0.5;
+      ctx.strokeStyle='rgba(185,140,40,0.55)';
+      ctx.lineCap='round';
+      ctx.beginPath();
+      ctx.moveTo(leg.hip.parent.x, leg.hip.parent.y);
+      ctx.lineTo(leg.hip.x, leg.hip.y);
+      ctx.lineTo(leg.thigh.x, leg.thigh.y);
+      ctx.lineTo(leg.shin.x, leg.shin.y);
+      ctx.lineTo(leg.foot.x, leg.foot.y);
+      ctx.stroke();
+      // foot dot
+      ctx.beginPath(); ctx.arc(leg.foot.x, leg.foot.y, S*0.9, 0, Math.PI*2);
+      ctx.fillStyle = leg.sys.step===0 ? 'rgba(220,180,60,0.8)' : 'rgba(100,200,120,0.7)';
+      ctx.fill();
+    });
+  });
+
+  ctx.shadowBlur = 0;
+}
+
+// ─── Mouse indicator ─────────────────────────────────────────────────────────
+function drawMouseDot(){
+  var x=Input.mouse.x, y=Input.mouse.y;
+  ctx.beginPath(); ctx.arc(x,y,9,0,Math.PI*2);
+  ctx.fillStyle='rgba(200,150,40,0.3)'; ctx.fill();
+  ctx.beginPath(); ctx.arc(x,y,28,0,Math.PI*2);
+  ctx.strokeStyle='rgba(200,150,40,0.1)'; ctx.lineWidth=1; ctx.stroke();
+}
+
+// ─── Main loop ───────────────────────────────────────────────────────────────
+// Spawn at center
+Input.mouse.x = window.innerWidth/2;
+Input.mouse.y = window.innerHeight/2;
+
+setInterval(()=>{
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // subtle vignette
+  var vgrd = ctx.createRadialGradient(canvas.width/2,canvas.height/2,canvas.height*0.3,
+                                       canvas.width/2,canvas.height/2,canvas.height*0.8);
+  vgrd.addColorStop(0,'rgba(0,0,0,0)');
+  vgrd.addColorStop(1,'rgba(0,0,0,0.6)');
+  ctx.fillStyle=vgrd; ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // strike behaviour: temporarily boost tail curl angle
+  if(striking){
+    strikeTimer++;
+    if(strikeTimer>30){ striking=false; strikeTimer=0; }
+    if(strikeTimer<10){
+      // tighten tail upward
+      tailSegs.forEach((t,i)=>{ t.defAngle = tailAngles[i]+0.4; });
+      stingerSeg.defAngle = -0.8;
+    } else {
+      tailSegs.forEach((t,i)=>{ t.defAngle = tailAngles[i]; });
+      stingerSeg.defAngle = -0.3;
+    }
+  }
+
+  scorpion.follow(Input.mouse.x, Input.mouse.y);
+  drawAll();
+  drawMouseDot();
+}, 33);
+</script>
+</body>
+</html>
