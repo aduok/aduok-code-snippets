@@ -1,64 +1,57 @@
 # Aduok Code Snippets
 
-A collection of code snippets, UI experiments, and mini projects featured on the **Aduok Code** YouTube channel.
+A collection of HTML, CSS, and JavaScript experiments featured on the **Aduok Code** YouTube channel.
 
-This repository contains the source code for examples shown in my YouTube Shorts, including animations, UI effects, and coding experiments.
+This repository contains small front-end demos, visual effects, and creative coding snippets from Shorts and related content.
 
-## 📺 Follow Aduok Code
+## Follow Aduok Code
 
-* **YouTube:** https://www.youtube.com/@aduok_code
-* **Instagram:** https://www.instagram.com/aduok_code/
+- **YouTube:** https://www.youtube.com/@aduok_code
+- **Instagram:** https://www.instagram.com/aduok_code/
 
-Follow for more coding experiments, UI tricks, and developer content.
+## Repository Structure
 
-## 📂 Repository Structure
+Current project layout:
 
-Each folder contains the code for a specific video or concept.
-
-```
-aduok-code-snippets
-│
-├── cursor-scorpion-animation
-├── grid-hover-effects
-├── flexbox-layout-demo
-├── typing-animation
-└── more-coming-soon
+```text
+aduok-code-snippets/
+├── blog/
+│   ├── cursor-scorpion-animation.html
+│   └── pencil-loader.html
+└── README.md
 ```
 
-## 🚀 How to Use
+## How to Use
 
-1. Clone the repository
+1. Clone the repository:
 
+```bash
+git clone https://github.com/aduok/aduok-code-snippets.git
 ```
-git clone https://github.com/your-username/aduok-code-snippets.git
-```
 
-2. Open the project folder
+2. Open the project folder:
 
-```
+```bash
 cd aduok-code-snippets
 ```
 
-3. Run the code (open the HTML file or run the project depending on the example).
+3. Open any demo from the `blog/` folder in a browser.
 
-## 💡 Topics Covered
+Example:
 
-* HTML
-* CSS
-* JavaScript
-* UI animations
-* Hover effects
-* Layout techniques
-* Creative coding experiments
+```bash
+open blog/pencil-loader.html
+```
 
-## ⭐ Support
+## Topics Covered
 
-If you found these snippets helpful:
+- HTML
+- CSS
+- JavaScript
+- UI animations
+- Loaders and visual effects
+- Creative coding experiments
 
-* ⭐ Star this repository
-* 📺 Subscribe to the **Aduok Code** channel
-* 📸 Follow on Instagram for updates
+## License
 
-## 📜 License
-
-This repository is open-source and available for learning and experimentation.
+This repository is open source and intended for learning and experimentation.

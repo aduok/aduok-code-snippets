@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dune Spinner</title>
+    <style>
+      *,
+      *::before,
+      *::after {
+        border: 0;
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        font-size: calc(16px + (20 - 16) * (100vw - 320px) / (1280 - 320));
+
+        --bg: hsl(28, 60%, 18%);
+        --sand-light: hsl(46, 88%, 90%);
+        --sand-mid: hsl(40, 70%, 70%);
+        --sand-deep: hsl(28, 60%, 52%);
+        --sand-dark: hsl(20, 52%, 38%);
+        --shadow-warm: hsla(20, 60%, 8%, 0.22);
+        --shadow-hard: hsla(20, 60%, 8%, 0.4);
+        --shine-warm: hsla(38, 70%, 55%, 0.22);
+
+        --size: 16em;
+        --orbit: -6.5em;
+        --orbit-mid: -6em;
+        --bead-size: 2.5em;
+        --spin-dur: 3s;
+      }
+
+      body {
+        background-color: var(--bg);
+        font: 1em/1.5 sans-serif;
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      [class^="dune-spinner"] {
+        border-radius: 50%;
+        position: absolute;
+      }
+
+      .dune-spinner {
+        position: relative;
+        width: var(--size);
+        height: var(--size);
+      }
+
+      .dune-spinner-ring-outer {
+        top: 0.75em;
+        left: 0.75em;
+        width: calc(100% - 1.5em);
+        height: calc(100% - 1.5em);
+        box-shadow:
+          0 -0.45em 0.375em hsla(20, 60%, 5%, 0.22),
+          0 0.5em 0.75em hsla(20, 60%, 5%, 0.22) inset,
+          0 0.25em 0.5em var(--shine-warm),
+          0 -0.5em 0.75em var(--shine-warm) inset;
+      }
+
+      .dune-spinner-ring-inner {
+        top: 2.375em;
+        left: 2.375em;
+        width: calc(100% - 4.75em);
+        height: calc(100% - 4.75em);
+        box-shadow:
+          0 -0.25em 0.5em var(--shine-warm),
+          0 0.5em 0.75em var(--shine-warm) inset,
+          0 0.5em 0.375em hsla(20, 60%, 5%, 0.25),
+          0 -0.5em 0.75em hsla(20, 60%, 5%, 0.22) inset;
+      }
+
+      .dune-spinner-veil {
+        inset: 0;
+        background: conic-gradient(var(--bg) 210deg, transparent 270deg);
+        animation: trackCover var(--spin-dur) linear infinite;
+      }
+
+      .dune-spinner-bead {
+        width: var(--bead-size);
+        height: var(--bead-size);
+        top: calc(50% - var(--bead-size) / 2);
+        left: calc(50% - var(--bead-size) / 2);
+        transform: rotate(0deg) translateY(var(--orbit));
+        animation: ball var(--spin-dur) linear infinite;
+      }
+
+      .dune-spinner-bead-wrap {
+        inset: 0;
+        overflow: hidden;
+        transform: translateZ(0);
+      }
+
+      .dune-spinner-bead-wrap::before {
+        content: "";
+        display: block;
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 200%;
+        height: 100%;
+        filter: brightness(1.05) saturate(1.1);
+        background:
+          radial-gradient(
+            ellipse 55% 40% at 25% 32%,
+            var(--sand-light) 0%,
+            transparent 52%
+          ),
+          radial-gradient(
+            ellipse 40% 28% at 70% 48%,
+            hsl(42, 78%, 82%) 0%,
+            transparent 50%
+          ),
+          radial-gradient(
+            circle at 50% 18%,
+            hsl(40, 72%, 80%) 0%,
+            transparent 40%
+          ),
+          radial-gradient(
+            circle at 18% 68%,
+            hsl(36, 65%, 72%) 0%,
+            transparent 38%
+          ),
+          radial-gradient(
+            circle at 80% 74%,
+            hsl(34, 68%, 68%) 0%,
+            transparent 40%
+          ),
+          linear-gradient(
+            148deg,
+            var(--sand-light) 0%,
+            var(--sand-mid) 32%,
+            var(--sand-deep) 68%,
+            var(--sand-dark) 100%
+          );
+        animation: ballTexture 0.28s linear infinite;
+      }
+
+      .dune-spinner-bead-shade {
+        inset: 0;
+        box-shadow:
+          0 0.1em 0.2em var(--shadow-hard),
+          0 0 0.2em hsla(20, 60%, 8%, 0.15) inset,
+          0 -1em 0.5em hsla(20, 60%, 8%, 0.25) inset;
+        animation: ballInnerShadow var(--spin-dur) linear infinite;
+      }
+
+      .dune-spinner-bead-drop {
+        top: 50%;
+        left: 0;
+        width: 100%;
+        height: 250%;
+        border-radius: 0 0 50% 50% / 0 0 100% 100%;
+        background: linear-gradient(var(--shadow-warm), transparent);
+        filter: blur(2px);
+        transform: rotate(20deg);
+        transform-origin: 50% 0;
+        z-index: -2;
+        animation: ballOuterShadow var(--spin-dur) linear infinite;
+      }
+
+      .dune-spinner-bead-flanks {
+        inset: 0;
+        background: hsla(20, 60%, 8%, 0.13);
+        filter: blur(2px);
+        transform: scale(0.75, 1.1);
+        z-index: -1;
+      }
+
+      @keyframes ball {
+        from {
+          transform: rotate(0deg) translateY(var(--orbit));
+        }
+        50% {
+          transform: rotate(180deg) translateY(var(--orbit-mid));
+        }
+        to {
+          transform: rotate(360deg) translateY(var(--orbit));
+        }
+      }
+
+      @keyframes ballInnerShadow {
+        to {
+          transform: rotate(-360deg);
+        }
+      }
+
+      @keyframes ballOuterShadow {
+        from {
+          transform: rotate(20deg);
+        }
+        to {
+          transform: rotate(-340deg);
+        }
+      }
+
+      @keyframes ballTexture {
+        to {
+          transform: translateX(50%);
+        }
+      }
+
+      @keyframes trackCover {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="dune-spinner">
+      <div class="dune-spinner-ring-outer"></div>
+      <div class="dune-spinner-ring-inner"></div>
+      <div class="dune-spinner-veil"></div>
+      <div class="dune-spinner-bead">
+        <div class="dune-spinner-bead-wrap"></div>
+        <div class="dune-spinner-bead-drop"></div>
+        <div class="dune-spinner-bead-shade"></div>
+        <div class="dune-spinner-bead-flanks"></div>
+      </div>
+    </div>
+  </body>
+</html>
