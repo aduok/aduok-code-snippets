@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@200;300;400;500;600;700;800;900&display=swap" />
+
+  <style>
+
+    /* ── Variables ────────────────────────────────────────────────────── */
+    :root {
+      --pink:         #ff2770;
+      --cyan:         #45f3ff;
+      --bg:           #151f28;
+      --card-fill:    #2d2d39;
+      --card-border:  #25252b;
+      --white:        #ffffff;
+      --placeholder:  #999999;
+      --text-dark:    #111111;
+
+      --card-w:       400px;
+      --card-h:       200px;
+      --card-w-open:  450px;
+      --card-h-open:  500px;
+
+      --speed:        0.5s;
+      --spin-speed:   4s;
+    }
+
+    /* ── Animated CSS property ────────────────────────────────────────── */
+    @property --angle {
+      syntax: "<angle>";
+      inherits: false;
+      initial-value: 0deg;
+    }
+
+    /* ── Reset ────────────────────────────────────────────────────────── */
+    *,
+    *::before,
+    *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: "Poppins", sans-serif;
+    }
+
+    /* ── Page ─────────────────────────────────────────────────────────── */
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: var(--bg);
+    }
+
+    /* ── Spin animation ───────────────────────────────────────────────── */
+    @keyframes spin {
+      from { --angle: 0deg;   }
+      to   { --angle: 360deg; }
+    }
+
+    /* ── Card wrapper ─────────────────────────────────────────────────── */
+    .card {
+      position: relative;
+      width: var(--card-w);
+      height: var(--card-h);
+      border-radius: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: repeating-conic-gradient(
+        from var(--angle),
+        var(--pink) 0%,
+        var(--pink) 5%,
+        transparent 5%,
+        transparent 40%,
+        var(--pink) 50%
+      );
+      filter: drop-shadow(0 15px 50px #000);
+      animation: spin var(--spin-speed) linear infinite;
+      transition: var(--speed);
+      cursor: pointer;
+    }
+
+    /* Cyan layer */
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: repeating-conic-gradient(
+        from var(--angle),
+        var(--cyan) 0%,
+        var(--cyan) 5%,
+        transparent 5%,
+        transparent 40%,
+        var(--cyan) 50%
+      );
+      filter: drop-shadow(0 15px 50px #000);
+      animation: spin var(--spin-speed) linear infinite;
+      animation-delay: -1s;
+    }
+
+    /* Dark fill */
+    .card::after {
+      content: "";
+      position: absolute;
+      inset: 4px;
+      border-radius: 15px;
+      background: var(--card-fill);
+      border: 8px solid var(--card-border);
+    }
+
+    /* ── Card open state ──────────────────────────────────────────────── */
+    .card:hover {
+      width: var(--card-w-open);
+      height: var(--card-h-open);
+    }
+
+    .card:hover .panel   { inset: 40px; }
+    .card:hover .content { transform: translateY(0); }
+
+    /* ── Glass panel ──────────────────────────────────────────────────── */
+    .panel {
+      position: absolute;
+      inset: 60px;
+      z-index: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.2);
+      color: var(--white);
+      box-shadow: inset 0 10px 20px rgba(0, 0, 0, 0.5);
+      border-bottom: 2px solid rgba(255, 255, 255, 0.5);
+      overflow: hidden;
+      transition: inset var(--speed);
+    }
+
+    /* ── Form content ─────────────────────────────────────────────────── */
+    .content {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+      width: 70%;
+      transform: translateY(126px);
+      transition: transform var(--speed);
+    }
+
+    /* ── Heading ──────────────────────────────────────────────────────── */
+    .content h2 {
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.2em;
+      white-space: nowrap;
+    }
+
+    .content h2 i,
+    .content h2 .icon {
+      color: var(--pink);
+      fill: var(--pink);
+      text-shadow: 0 0 5px var(--pink), 0 0 20px var(--pink);
+      filter: drop-shadow(0 0 5px var(--pink)) drop-shadow(0 0 10px var(--pink));
+      vertical-align: middle;
+    }
+
+    /* ── Inputs ───────────────────────────────────────────────────────── */
+    .content input {
+      width: 100%;
+      padding: 10px 20px;
+      font-size: 1em;
+      color: var(--white);
+      background: rgba(0, 0, 0, 0.1);
+      border: 2px solid var(--white);
+      border-radius: 30px;
+      outline: none;
+    }
+
+    .content input::placeholder {
+      color: var(--placeholder);
+    }
+
+    .content input[type="submit"] {
+      background: var(--cyan);
+      border-color: transparent;
+      color: var(--text-dark);
+      font-weight: 500;
+      cursor: pointer;
+      transition: box-shadow var(--speed);
+    }
+
+    .content input[type="submit"]:hover {
+      box-shadow: 0 0 10px var(--cyan), 0 0 60px var(--cyan);
+    }
+
+    /* ── Footer links ─────────────────────────────────────────────────── */
+    .links {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .links a {
+      color: var(--white);
+      text-decoration: none;
+      font-size: 0.9em;
+    }
+
+    .links a:last-child {
+      color: var(--pink);
+      font-weight: 600;
+    }
+
+  </style>
+</head>
+
+<body>
+
+  <div class="card">
+    <div class="panel">
+      <div class="content">
+
+        <h2>
+          <!-- login arrow icon -->
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="18" height="18" fill="currentColor">
+            <path d="M352 96l64 0c17.7 0 32 14.3 32 32l0 256c0 17.7-14.3 32-32 32l-64 0c-17.7 0-32 14.3-32 32s14.3 32 32 32l64 0c53 0 96-43 96-96l0-256c0-53-43-96-96-96l-64 0c-17.7 0-32 14.3-32 32s14.3 32 32 32zm-9.4 182.6c12.5-12.5 12.5-32.8 0-45.3l-128-128c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L242.7 224 32 224c-17.7 0-32 14.3-32 32s14.3 32 32 32l210.7 0-73.4 73.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0l128-128z"/>
+          </svg>
+          Login
+          <!-- heart icon -->
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="18" height="18" fill="currentColor">
+            <path d="M47.6 300.4L228.3 469.1c7.5 7 17.4 10.9 27.7 10.9s20.2-3.9 27.7-10.9L464.4 300.4c30.4-28.3 47.6-68 47.6-109.5v-5.8c0-69.9-50.5-129.5-119.4-141C347 36.5 300.6 51.4 268 84L256 96 244 84c-32.6-32.6-79-47.5-124.6-39.9C50.5 55.6 0 115.2 0 185.1v5.8c0 41.5 17.2 81.2 47.6 109.5z"/>
+          </svg>
+        </h2>
+
+        <input type="text"     placeholder="Username" autocomplete="username" />
+        <input type="password" placeholder="Password" autocomplete="current-password" />
+        <input type="submit"   value="Sign in" />
+
+        <div class="links">
+          <a href="#">Forgot Password</a>
+          <a href="#">Sign up</a>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
