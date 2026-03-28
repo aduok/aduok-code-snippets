@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Delete Button</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600&display=swap" rel="stylesheet" />
+  <style>
+    /* ─── Base ─────────────────────────────────────────────────────── */
+
+    html {
+      box-sizing: border-box;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: inherit;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Inter', Arial, sans-serif;
+      background: #eceffc;
+    }
+
+    /* ─── Button ───────────────────────────────────────────────────── */
+
+    .button {
+      /* color tokens */
+      --background:       #2b3044;
+      --background-hover: #1e2235;
+      --text:             #fff;
+      --shadow:           rgba(0, 9, 61, 0.2);
+      --paper:            #5c86ff;
+      --paper-lines:      #fff;
+      --trash:            #e1e6f9;
+      --trash-lines:      #bbc1e1;
+      --check:            #fff;
+      --check-background: #5c86ff;
+
+      position: relative;
+      display: flex;
+      align-items: center;
+      min-width: 142px;
+      padding: 10px 24px;
+      border: none;
+      border-radius: 7px;
+      outline: none;
+      cursor: pointer;
+      color: var(--text);
+      background: var(--btn, var(--background));
+      box-shadow: 0 var(--shadow-y, 4px) var(--shadow-blur, 8px) var(--shadow);
+      transform: scale(var(--scale, 1));
+      transition: transform 0.3s, box-shadow 0.3s, background 0.3s;
+      -webkit-appearance: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .button:hover,
+    .button.delete {
+      --btn:         var(--background-hover);
+      --shadow-y:    5px;
+      --shadow-blur: 9px;
+    }
+
+    .button:active {
+      --shadow-y:    2px;
+      --shadow-blur: 5px;
+      --scale:       0.94;
+    }
+
+    /* ─── Label ────────────────────────────────────────────────────── */
+
+    .button__label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 25px;
+      opacity: var(--span-opacity, 1);
+      transform: translateX(var(--span-x, 0)) translateZ(0);
+      transition:
+        transform 0.4s ease var(--span-delay, 0.2s),
+        opacity   0.3s ease var(--span-delay, 0.2s);
+    }
+
+    /* ─── Trash icon ───────────────────────────────────────────────── */
+
+    .trash {
+      display: block;
+      position: relative;
+      left: -8px;
+      transform: translate(var(--trash-x, 0), var(--trash-y, 1px)) translateZ(0) scale(var(--trash-scale, 0.64));
+      transition: transform 0.5s;
+    }
+
+    /* lid tines */
+    .trash::before,
+    .trash::after {
+      content: '';
+      position: absolute;
+      bottom: 100%;
+      width: 2px;
+      height: 8px;
+      border-radius: 1px;
+      background: var(--icon, var(--trash));
+      transform-origin: 50% 6px;
+      transform: translate(var(--x, 3px), 2px) scaleY(var(--sy, 0.7)) rotate(var(--r, 0deg));
+      transition: transform 0.4s, background 0.3s;
+    }
+
+    .trash::before { left: 1px; }
+    .trash::after  { right: 1px; --x: -3px; }
+
+    /* ─── Lid ──────────────────────────────────────────────────────── */
+
+    .trash__lid {
+      position: absolute;
+      bottom: 100%;
+      left: -4px;
+      right: -4px;
+      height: 40px;
+      overflow: hidden;
+      z-index: 1;
+      transform: translateY(2px);
+    }
+
+    /* handle nub */
+    .trash__lid::before {
+      content: '';
+      position: absolute;
+      bottom: var(--b, 5px);
+      left: var(--l, 8px);
+      width: var(--w, 12px);
+      height: var(--h, 2px);
+      border-radius: 1px;
+      background: var(--icon, var(--trash));
+      transition: background 0.3s, transform 0.4s;
+    }
+
+    /* lid bar */
+    .trash__lid::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 28px;
+      height: 2px;
+      border-radius: 1px;
+      background: var(--icon, var(--trash));
+      transform: scaleX(var(--trash-line-scale, 1));
+      transition: background 0.3s, transform 0.4s;
+    }
+
+    /* ─── Paper note ───────────────────────────────────────────────── */
+
+    .trash__paper {
+      position: absolute;
+      bottom: 0;
+      left: 7px;
+      width: 14px;
+      height: 18px;
+      border-radius: 1px;
+      background: var(--paper);
+      opacity: 0;
+      transform: translateY(-16px);
+    }
+
+    .trash__paper::before,
+    .trash__paper::after {
+      content: '';
+      position: absolute;
+      left: 2px;
+      top: var(--t, 2px);
+      width: var(--w, 10px);
+      height: 2px;
+      border-radius: 1px;
+      background: var(--paper-lines);
+      transform: scaleY(0.7);
+      box-shadow: 0 9px 0 var(--paper-lines);
+    }
+
+    .trash__paper::after {
+      --t: 5px;
+      --w: 7px;
+    }
+
+    /* ─── Bin body ─────────────────────────────────────────────────── */
+
+    .trash__bin {
+      position: relative;
+      width: 20px;
+      height: 25px;
+      border: 2px solid var(--icon, var(--trash));
+      border-radius: 1px 1px 4px 4px;
+      overflow: hidden;
+      z-index: 2;
+      transition: border-color 0.3s;
+    }
+
+    /* vertical ridges */
+    .trash__bin::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      width: 4px;
+      height: 20px;
+      border-radius: 2px;
+      margin-left: -2px;
+      background: var(--trash-lines);
+      transform: translateX(-3px) scale(0.6);
+      box-shadow: 10px 0 0 var(--trash-lines);
+      opacity: var(--trash-lines-opacity, 1);
+      transition: transform 0.4s, opacity 0.4s;
+    }
+
+    /* paper strip that animates through the bin */
+    .trash__bin::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 1px;
+      width: 4px;
+      height: 16px;
+      background: var(--paper);
+      transform: translate(-0.5px, -16px) scaleX(0.5);
+      box-shadow: 7px 0 0 var(--paper), 14px 0 0 var(--paper), 21px 0 0 var(--paper);
+    }
+
+    /* ─── Checkmark badge ──────────────────────────────────────────── */
+
+    .trash__check {
+      position: absolute;
+      top: 24px;
+      left: 2px;
+      padding: 4px 3px;
+      border-radius: 50%;
+      background: var(--check-background);
+      opacity: var(--check-opacity, 0);
+      transform: translateY(var(--check-y, 0)) scale(var(--check-scale, 0.2));
+      transition:
+        transform var(--check-duration,         0.2s) ease var(--check-delay, 0s),
+        opacity   var(--check-duration-opacity,  0.2s) ease var(--check-delay, 0s);
+    }
+
+    .trash__check svg {
+      display: block;
+      width: 8px;
+      height: 6px;
+      fill: none;
+      stroke: var(--check);
+      stroke-width: 1.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-dasharray: 9px;
+      stroke-dashoffset: var(--check-offset, 9px);
+      transition: stroke-dashoffset 0.4s ease var(--checkmark-delay, 0.4s);
+    }
+
+    /* ─── Delete state ─────────────────────────────────────────────── */
+
+    .button.delete {
+      --span-opacity:          0;
+      --span-x:                16px;
+      --span-delay:            0s;
+      --trash-x:               46px;
+      --trash-y:               2px;
+      --trash-scale:           1;
+      --trash-lines-opacity:   0;
+      --trash-line-scale:      0;
+      --icon:                  #fff;
+      --check-offset:          0;
+      --check-opacity:         1;
+      --check-scale:           1;
+      --check-y:               16px;
+      --check-delay:           1.7s;
+      --checkmark-delay:       2.1s;
+      --check-duration:        0.55s;
+      --check-duration-opacity: 0.3s;
+    }
+
+    .button.delete .trash::before { --sy: 1; --x: 0; --r:  40deg; }
+    .button.delete .trash::after  { --sy: 1; --x: 0; --r: -40deg; }
+
+    .button.delete .trash__paper    { animation: paper 1.5s linear forwards 0.5s; }
+    .button.delete .trash__bin::after { animation: cut   1.5s linear forwards 0.5s; }
+
+    /* ─── Keyframes ────────────────────────────────────────────────── */
+
+    @keyframes paper {
+      10%, 100% { opacity: 1; }
+      20%       { transform: translateY(-16px); }
+      40%       { transform: translateY(0); }
+      70%, 100% { transform: translateY(24px); }
+    }
+
+    @keyframes cut {
+      0%,  40% { transform: translate(-0.5px, -16px) scaleX(0.5); }
+      100%     { transform: translate(-0.5px,  24px) scaleX(0.5); }
+    }
+  </style>
+</head>
+<body>
+
+  <button class="button" type="button" aria-label="Delete item">
+    <div class="trash" aria-hidden="true">
+      <div class="trash__lid">
+        <div class="trash__paper"></div>
+      </div>
+      <div class="trash__bin"></div>
+      <div class="trash__check">
+        <svg viewBox="0 0 8 6">
+          <polyline points="1 3.4 2.71428571 5 7 1"></polyline>
+        </svg>
+      </div>
+    </div>
+    <span class="button__label">Delete Item</span>
+  </button>
+
+  <script>
+    const ANIMATION_DURATION = 3200;
+
+    document.querySelectorAll('.button').forEach((button) => {
+      button.addEventListener('click', (e) => {
+        e.preventDefault();
+
+        if (button.classList.contains('delete')) return;
+
+        button.classList.add('delete');
+        setTimeout(() => button.classList.remove('delete'), ANIMATION_DURATION);
+      });
+    });
+  </script>
+
+</body>
+</html>
