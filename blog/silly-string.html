@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ADUOK Silly String</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  user-select: none;
+  background: #f0ece4;
+}
+
+#canvas {
+  display: block;
+  position: fixed;
+  inset: 0;
+  cursor: none;
+}
+
+#btn-reset {
+  position: fixed; top: 18px; left: 18px;
+  font: 400 10px 'Space Mono', monospace;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: rgba(30,20,10,0.3);
+  background: rgba(30,20,10,0.04);
+  border: 1px solid rgba(30,20,10,0.07);
+  padding: 6px 14px; border-radius: 5px;
+  cursor: pointer;
+  transition: background .2s, color .2s;
+  z-index: 10;
+}
+#btn-reset:hover { background: rgba(30,20,10,0.08); color: rgba(30,20,10,0.5); }
+
+#panel {
+  position: fixed; top: 14px; right: 14px;
+  width: 210px; z-index: 10;
+  cursor: default;
+}
+
+#btn-toggle {
+  width: 100%; padding: 8px 14px;
+  font: 400 10px 'Space Mono', monospace;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: rgba(30,20,10,0.38);
+  background: rgba(30,20,10,0.04);
+  border: 1px solid rgba(30,20,10,0.07);
+  border-radius: 7px;
+  cursor: pointer;
+  text-align: left; transition: all .2s;
+}
+#btn-toggle:hover { background: rgba(30,20,10,0.08); color: rgba(30,20,10,0.55); }
+#btn-toggle.open { border-radius: 7px 7px 0 0; border-bottom-color: transparent; }
+
+#controls {
+  background: rgba(248,244,236,0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(30,20,10,0.07); border-top: none;
+  border-radius: 0 0 7px 7px;
+  overflow: hidden; opacity: 0;
+  max-height: 0;
+  padding: 0 16px;
+  transition: max-height .35s ease, opacity .25s ease, padding .3s ease;
+  cursor: default;
+}
+#controls.open { max-height: 340px; opacity: 1; padding: 16px 16px 20px; }
+
+.ctrl-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+.ctrl-group:last-child { margin-bottom: 0; }
+
+.ctrl-label {
+  font: 400 9px 'Space Mono', monospace;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: rgba(30,20,10,0.32);
+}
+
+input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 3px;
+  background: rgba(30,20,10,0.1); border-radius: 2px;
+  outline: none; cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 13px; height: 13px; border-radius: 50%;
+  background: #f0ece4;
+  border: 1.5px solid rgba(30,20,10,0.22);
+  box-shadow: 0 1px 5px rgba(30,20,10,0.12);
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  border-color: rgba(30,20,10,0.4);
+  box-shadow: 0 1px 7px rgba(30,20,10,0.18);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 13px; height: 13px; border-radius: 50%;
+  background: #f0ece4;
+  border: 1.5px solid rgba(30,20,10,0.22);
+  box-shadow: 0 1px 5px rgba(30,20,10,0.12);
+  cursor: pointer;
+}
+input[type="range"]::-moz-range-track {
+  height: 3px; background: rgba(30,20,10,0.1);
+  border-radius: 2px; border: none;
+}
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+<button id="btn-reset">Reset</button>
+
+<div id="panel">
+  <button id="btn-toggle">Settings &#8597;</button>
+  <div id="controls">
+    <div class="ctrl-group">
+      <span class="ctrl-label">Pressure</span>
+      <input type="range" id="r-pressure" min="0" max="100" value="50">
+    </div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">Gravity</span>
+      <input type="range" id="r-gravity" min="-100" max="100" value="30">
+    </div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">Curliness</span>
+      <input type="range" id="r-curl" min="0" max="100" value="50">
+    </div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">Thickness</span>
+      <input type="range" id="r-thick" min="0" max="100" value="40">
+    </div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">Chaos</span>
+      <input type="range" id="r-chaos" min="0" max="100" value="25">
+    </div>
+  </div>
+</div>
+
+<script>
+// =========================================================
+//  CANVAS SETUP
+// =========================================================
+const canvas = document.getElementById('canvas');
+const ctx    = canvas.getContext('2d');
+let W, H;
+
+document.getElementById('btn-toggle').addEventListener('click', function () {
+  this.classList.toggle('open');
+  document.getElementById('controls').classList.toggle('open');
+});
+document.getElementById('btn-reset').addEventListener('click', () => {
+  strands.length = 0;
+  activStrand = null;
+});
+
+function sliderVal(id) { return +document.getElementById(id).value; }
+
+// =========================================================
+//  LOGO — SVG paths for ADUOK
+//  Padding: 10px on all sides inside viewBox so thick strokes never clip
+//  Each letter ~36px wide, 14px gap between letters
+//  Letter x-offsets from left-pad=10:
+//    A: 10        D: 60        U: 110        O: 160        K: 214
+//  ViewBox width:  10 + 36 + 14 + 36 + 14 + 36 + 14 + 34 + 14 + 38 + 10 = 260
+//  ViewBox height: 10 + 72 + 10 = 92
+// =========================================================
+let logoImg      = null;
+let collisionMap = null;
+let logoX, logoY, logoW, logoH;
+let logoReady    = false;
+
+function makeSVG(sw) {
+  const P = 10;   // padding so strokes don't clip
+  const T = P;    // top y = 10
+  const B = 82;   // bottom y  (height = 92 total)
+  const MID = (T + B) / 2;  // 46
+
+  const aX = P;    // A : 10–46
+  const dX = 60;   // D : 60–102
+  const uX = 116;  // U : 116–152
+  const oCX = 183; // O : cx=183, rx=20, so 163–203
+  const kX = 217;  // K : 217–253
+
+  const strokeAttr = `fill="none" stroke="#1a1208" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"`;
+
+  // All letters except O as a single path
+  const d = [
+    // A
+    `M${aX} ${B} L${aX+18} ${T} L${aX+36} ${B}`,
+    `M${aX+6} ${T+(B-T)*0.58} L${aX+30} ${T+(B-T)*0.58}`,
+    // D — stem + right curve
+    `M${dX} ${T} L${dX} ${B}`,
+    `M${dX} ${T} Q${dX+46} ${T} ${dX+46} ${MID} Q${dX+46} ${B} ${dX} ${B}`,
+    // U
+    `M${uX} ${T} L${uX} ${MID+10} Q${uX} ${B} ${uX+18} ${B} Q${uX+36} ${B} ${uX+36} ${MID+10} L${uX+36} ${T}`,
+    // K
+    `M${kX} ${T} L${kX} ${B}`,
+    `M${kX} ${MID} L${kX+34} ${T}`,
+    `M${kX} ${MID} L${kX+34} ${B}`,
+  ].join(' ');
+
+  // O as a proper ellipse element — always renders correctly
+  const oCY  = MID;
+  const oRX  = 20;
+  const oRY  = (B - T) / 2;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 262 92" ${strokeAttr}>` +
+    `<path d="${d}"/>` +
+    `<ellipse cx="${oCX}" cy="${oCY}" rx="${oRX}" ry="${oRY}"/>` +
+    `</svg>`;
+}
+
+function svgToURL(svg) {
+  return 'data:image/svg+xml,' + encodeURIComponent(svg);
+}
+
+function loadImg(url) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.src = url;
+  });
+}
+
+async function buildLogo() {
+  logoReady = false;
+
+  logoW = W * 0.62;
+  logoH = logoW * (92 / 262);
+  logoX = (W - logoW) / 2;
+  logoY = (H - logoH) / 2;
+
+  logoImg = await loadImg(svgToURL(makeSVG(6)));
+
+  const collImg = await loadImg(svgToURL(makeSVG(10)));
+  const off = document.createElement('canvas');
+  off.width = W; off.height = H;
+  const offCtx = off.getContext('2d');
+  offCtx.drawImage(collImg, logoX, logoY, logoW, logoH);
+  const data = offCtx.getImageData(0, 0, W, H).data;
+  collisionMap = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) collisionMap[i] = data[i * 4 + 3];
+
+  logoReady = true;
+}
+
+function isLogoPixel(x, y) {
+  if (!logoReady) return false;
+  const px = x | 0, py = y | 0;
+  if (px < 0 || py < 0 || px >= W || py >= H) return false;
+  return collisionMap[py * W + px] > 18;
+}
+
+// =========================================================
+//  RESIZE
+// =========================================================
+function resize() {
+  W = canvas.width  = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  logoReady = false;
+  buildLogo();
+}
+resize();
+window.addEventListener('resize', resize);
+
+// =========================================================
+//  PHYSICS: Particle + Link
+// =========================================================
+class Particle {
+  constructor(x, y) {
+    this.x = x; this.y = y;
+    this.prevX = x; this.prevY = y;
+    this.restCount = 0;
+    this.resting   = false;
+  }
+  update() {
+    if (this.resting) return;
+    const g  = sliderVal('r-gravity') / 100 * 0.42;
+    const vx = (this.x - this.prevX) * 0.968;
+    const vy = (this.y - this.prevY) * 0.968;
+    this.prevX = this.x; this.prevY = this.y;
+    this.x += vx; this.y += vy + g;
+
+    if (isLogoPixel(this.x, this.y)) {
+      if      (!isLogoPixel(this.x, this.prevY)) { this.y = this.prevY; this.prevY = this.y; }
+      else if (!isLogoPixel(this.prevX, this.y)) { this.x = this.prevX; this.prevX = this.x; }
+      else { this.x = this.prevX; this.y = this.prevY; }
+      this.prevX = this.x; this.prevY = this.y;
+      this.restCount += 4;
+    }
+    if (this.y >= H - 1) { this.y = H - 1; this.prevY = this.y; this.restCount += 4; }
+    if (this.y < 0)      { this.y = 0;     this.prevY = 0;      this.restCount += 4; }
+    if (this.x < 0) this.x = 0;
+    if (this.x > W) this.x = W;
+    if (this.restCount > 16) this.resting = true;
+  }
+}
+
+class Link {
+  constructor(a, b) {
+    this.a = a; this.b = b;
+    this.restLen = 2.5; this.broken = false;
+  }
+  solve() {
+    if (this.broken) return;
+    const dx   = this.b.x - this.a.x, dy = this.b.y - this.a.y;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 0.001;
+    if (dist > 28) { this.broken = true; return; }
+    const f = (this.restLen - dist) / dist * 0.25;
+    if (!this.a.resting) { this.a.x -= dx * f; this.a.y -= dy * f; }
+    if (!this.b.resting) { this.b.x += dx * f; this.b.y += dy * f; }
+  }
+}
+
+// =========================================================
+//  STRAND
+// =========================================================
+const PALETTE      = ['#ff1493','#00d9a0','#ffc400','#00b8ff','#ff5533','#b84dff'];
+const PALETTE_LITE = ['#ff6ec7','#66ffc8','#ffe066','#66d9ff','#ff9a75','#d4a0ff'];
+let colorIndex  = 0;
+let strands     = [];
+let activStrand = null;
+
+class Strand {
+  constructor(ci) { this.colorIndex = ci; this.particles = []; this.links = []; }
+  emit(x, y, vx, vy) {
+    const p    = new Particle(x, y);
+    p.prevX    = x - vx; p.prevY = y - vy;
+    if (this.particles.length)
+      this.links.push(new Link(this.particles[this.particles.length - 1], p));
+    this.particles.push(p);
+  }
+}
+
+// =========================================================
+//  SPRAY CAN
+// =========================================================
+const CAN_W = 18, CAN_H = 46, NX = 10, NY = -CAN_H / 2 - 3;
+
+function getAimAngle(cx, cy) {
+  const raw = Math.atan2(H / 2 - cy, W / 2 - cx);
+  return Math.atan2(Math.sin(raw) * 0.15, Math.cos(raw));
+}
+function getNozzleTip(cx, cy, angle) {
+  return {
+    x: cx + NX * Math.cos(angle) - NY * Math.sin(angle),
+    y: cy + NX * Math.sin(angle) + NY * Math.cos(angle),
+  };
+}
+function rrect(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x+r,y); c.lineTo(x+w-r,y); c.quadraticCurveTo(x+w,y,x+w,y+r);
+  c.lineTo(x+w,y+h-r); c.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  c.lineTo(x+r,y+h); c.quadraticCurveTo(x,y+h,x,y+h-r);
+  c.lineTo(x,y+r); c.quadraticCurveTo(x,y,x+r,y); c.closePath();
+}
+
+function drawCan(cx, cy) {
+  const angle = getAimAngle(cx, cy);
+  ctx.save();
+  ctx.translate(cx, cy); ctx.rotate(angle);
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.1)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 4;
+  const bg = ctx.createLinearGradient(-CAN_W/2, 0, CAN_W/2, 0);
+  bg.addColorStop(0,'#8a1c1c'); bg.addColorStop(0.12,'#cc3030');
+  bg.addColorStop(0.4,'#e84a44'); bg.addColorStop(0.62,'#e03c3c');
+  bg.addColorStop(0.85,'#cc3030'); bg.addColorStop(1,'#7a1414');
+  ctx.fillStyle = bg;
+  rrect(ctx,-CAN_W/2,-CAN_H/2,CAN_W,CAN_H,4); ctx.fill();
+  ctx.restore();
+
+  const mg = ctx.createLinearGradient(-CAN_W/2,0,CAN_W/2,0);
+  mg.addColorStop(0,'#aaa'); mg.addColorStop(0.4,'#ddd'); mg.addColorStop(1,'#999');
+  ctx.fillStyle = mg;
+  rrect(ctx,-CAN_W/2+1,CAN_H/2-3,CAN_W-2,3,1); ctx.fill();
+  rrect(ctx,-CAN_W/2+1,-CAN_H/2,CAN_W-2,3,1);  ctx.fill();
+
+  ctx.fillStyle='rgba(255,255,255,0.07)';
+  rrect(ctx,-CAN_W/2+2,-5,CAN_W-4,12,2); ctx.fill();
+
+  ctx.fillStyle='rgba(255,255,255,0.28)';
+  ctx.font='bold 4px "Space Mono",monospace';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('ADUOK',0,-2); ctx.fillText('CODE',0,3.5);
+
+  ctx.fillStyle=mg;
+  rrect(ctx,-5,-CAN_H/2-4,10,5,2); ctx.fill();
+
+  ctx.fillStyle = activStrand ? PALETTE[activStrand.colorIndex] : '#cc2020';
+  ctx.beginPath(); ctx.ellipse(0,-CAN_H/2-5,4,2,0,0,Math.PI*2); ctx.fill();
+
+  ctx.fillStyle='#c0c0c0';
+  ctx.beginPath();
+  ctx.moveTo(2,-CAN_H/2-3); ctx.lineTo(NX-1,NY-1);
+  ctx.lineTo(NX-1,NY+2); ctx.lineTo(2,-CAN_H/2+1);
+  ctx.closePath(); ctx.fill();
+
+  ctx.fillStyle='#888';
+  ctx.beginPath(); ctx.arc(NX,NY,2,0,Math.PI*2); ctx.fill();
+
+  if (spraying && activStrand) {
+    for (let i=0;i<4;i++){
+      const d=1+Math.random()*6;
+      ctx.fillStyle=PALETTE[activStrand.colorIndex];
+      ctx.globalAlpha=0.06+Math.random()*0.1;
+      ctx.beginPath(); ctx.arc(NX+d,NY+(Math.random()-.5)*4,0.25+Math.random()*0.5,0,Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  }
+  ctx.restore();
+}
+
+// =========================================================
+//  RENDER STRANDS
+// =========================================================
+function renderStrands() {
+  const thick = 0.5 + sliderVal('r-thick') / 100 * 3.5;
+  for (const strand of strands) {
+    const pts = strand.particles;
+    if (pts.length < 2) continue;
+    const col  = PALETTE[strand.colorIndex];
+    const colL = PALETTE_LITE[strand.colorIndex];
+    ctx.lineCap='round'; ctx.lineJoin='round';
+    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i=1;i<pts.length;i++){
+      const lk=strand.links[i-1];
+      if (lk&&lk.broken){ctx.moveTo(pts[i].x,pts[i].y);continue;}
+      const dx=pts[i].x-pts[i-1].x, dy=pts[i].y-pts[i-1].y;
+      if (dx*dx+dy*dy>600){ctx.moveTo(pts[i].x,pts[i].y);continue;}
+      ctx.quadraticCurveTo(pts[i-1].x,pts[i-1].y,(pts[i-1].x+pts[i].x)/2,(pts[i-1].y+pts[i].y)/2);
+    }
+    ctx.save();
+    ctx.shadowColor=col; ctx.shadowBlur=3;
+    ctx.strokeStyle=col; ctx.globalAlpha=0.1; ctx.lineWidth=thick+2.5; ctx.stroke();
+    ctx.restore();
+    ctx.strokeStyle=col; ctx.globalAlpha=0.88; ctx.lineWidth=thick; ctx.stroke();
+    ctx.strokeStyle=colL; ctx.globalAlpha=0.18; ctx.lineWidth=thick*0.28; ctx.stroke();
+    ctx.globalAlpha=1;
+  }
+}
+
+// =========================================================
+//  EMISSION
+// =========================================================
+let sprayTimer = 0;
+function emitString(cx, cy) {
+  if (!activStrand) return;
+  sprayTimer++;
+  const angle    = getAimAngle(cx, cy);
+  const tip      = getNozzleTip(cx, cy, angle);
+  const pressure = 3 + sliderVal('r-pressure') / 100 * 11;
+  const curlAmt  = sliderVal('r-curl') / 100 * 4;
+  const chaos    = sliderVal('r-chaos') / 100 * 1.25;
+  for (let j=0;j<3;j++){
+    const speed  = pressure + Math.random()*2;
+    const curl   = Math.sin(sprayTimer*0.34 + j*1.8)*curlAmt;
+    const wobble = (Math.random()-0.5)*(0.15+chaos);
+    const perp   = angle + Math.PI/2;
+    activStrand.emit(tip.x,tip.y,
+      Math.cos(angle+wobble)*speed+Math.cos(perp)*curl,
+      Math.sin(angle+wobble)*speed+Math.sin(perp)*curl);
+  }
+  let total=0;
+  for (const s of strands) total+=s.particles.length;
+  while (total>9000&&strands.length>1){
+    const o=strands[0]; if(o===activStrand)break;
+    if(o.particles.length>0){o.particles.shift();if(o.links.length)o.links.shift();total--;}
+    else strands.shift();
+  }
+}
+
+// =========================================================
+//  INPUT
+// =========================================================
+let mouseX  = W/2, mouseY = H/2;
+let spraying  = false;
+let demoMode  = true;
+let overUI    = false;
+
+['btn-reset','panel'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('mouseenter', () => { overUI = true;  });
+  el.addEventListener('mouseleave', () => { overUI = false; });
+});
+
+function startSpray() {
+  demoMode=false; spraying=true; sprayTimer=0;
+  activStrand = new Strand(colorIndex++ % PALETTE.length);
+  strands.push(activStrand);
+}
+function endSpray() { spraying=false; activStrand=null; }
+
+window.addEventListener('mousedown', e => {
+  if (e.target.closest('#panel')||e.target.closest('#btn-reset')) return;
+  startSpray();
+});
+window.addEventListener('mouseup', endSpray);
+window.addEventListener('mousemove', e => {
+  mouseX=e.clientX; mouseY=e.clientY;
+  if (demoMode&&!e.target.closest('#panel')&&!e.target.closest('#btn-reset')) demoMode=false;
+});
+window.addEventListener('touchstart', e => {
+  if (e.target.closest('#panel')||e.target.closest('#btn-reset')) return;
+  e.preventDefault();
+  mouseX=e.touches[0].clientX; mouseY=e.touches[0].clientY;
+  startSpray();
+},{passive:false});
+window.addEventListener('touchmove', e => {
+  if (e.target.closest('#panel')) return;
+  e.preventDefault();
+  mouseX=e.touches[0].clientX; mouseY=e.touches[0].clientY;
+},{passive:false});
+window.addEventListener('touchend', endSpray);
+
+// =========================================================
+//  MAIN LOOP
+// =========================================================
+let demoTick = 0;
+function loop() {
+  demoTick++;
+  let canX=mouseX, canY=mouseY;
+
+  if (demoMode) {
+    canX = W*0.1 + ((Math.sin(demoTick*0.007)+1)/2)*W*0.8;
+    canY = H*0.12 + Math.sin(demoTick*0.028)*12;
+    if (demoTick%2===0){
+      if (!activStrand||activStrand.particles.length>160){
+        activStrand=new Strand(colorIndex++%PALETTE.length);
+        strands.push(activStrand);
+      }
+      spraying=true;
+    }
+  }
+
+  ctx.fillStyle='#f0ece4'; ctx.fillRect(0,0,W,H);
+
+  if (spraying) emitString(canX, canY);
+
+  for (const s of strands){
+    for (const p of s.particles) p.update();
+    for (let i=0;i<2;i++) for (const lk of s.links) lk.solve();
+  }
+
+  renderStrands();
+
+  // Draw logo on top
+  if (logoImg && logoReady) ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
+
+  // Draw can unless mouse is over UI
+  if (!overUI || demoMode) drawCan(canX, canY);
+
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
