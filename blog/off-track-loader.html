@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Off Track Loader</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+
+    :root {
+      --surface: hsl(250, 15%, 96%);
+      --ink: hsl(250, 15%, 12%);
+      font-size: clamp(16px, calc(16px + (24 - 16) * (100vw - 320px) / 960), 24px);
+    }
+
+    body {
+      background-color: var(--surface);
+      color: var(--ink);
+      font-family: sans-serif;
+      line-height: 1.5;
+      height: 100vh;
+      display: grid;
+      place-items: center;
+      transition: background-color 0.3s;
+    }
+
+    .coil {
+      width: 8em;
+      height: 8em;
+      animation: jolt 3s linear infinite;
+    }
+
+    .coil-track {
+      fill: none;
+      stroke: hsla(250, 15%, 12%, 0.08);
+      stroke-width: 16;
+      stroke-linecap: round;
+      transition: stroke 0.3s;
+    }
+
+    .coil-strand {
+      fill: none;
+      stroke: url(#coil-gradient);
+      stroke-width: 16;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-dasharray: 44 1111;
+      stroke-dashoffset: 10;
+      animation: spiral 3s cubic-bezier(0.42, 0.17, 0.75, 0.83) infinite;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --surface: hsl(250, 15%, 10%);
+        --ink: hsl(250, 15%, 92%);
+      }
+
+      .coil-track {
+        stroke: hsla(250, 15%, 92%, 0.08);
+      }
+    }
+
+    @keyframes jolt {
+      from, 41%, 45%, 50%, 54%, 58%, 62%, 66%, 70%, 73%, 77%, 80%, 84%, 87%, 91%, to {
+        transform: translate(0, 0);
+      }
+      43%  { transform: translate(2.1%,    5.4%);  }
+      52%  { transform: translate(-14.2%,  1.3%);  }
+      60%  { transform: translate(4.8%,   -3.1%);  }
+      68%  { transform: translate(-1.4%,  12.6%);  }
+      75%  { transform: translate(-3.3%,  -5.9%);  }
+      82%  { transform: translate(7.7%,    2.2%);  }
+      89%  { transform: translate(-5.1%,   0.8%);  }
+    }
+
+    @keyframes spiral {
+      from { stroke-dashoffset: 10;   }
+      25%  { stroke-dashoffset: 295;  }
+      to   { stroke-dashoffset: 1165; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <svg
+      class="coil"
+      viewBox="0 0 128 128"
+      xmlns="http://www.w3.org/2000/svg"
+      role="img"
+      aria-label="Loading"
+    >
+      <defs>
+        <linearGradient id="coil-gradient" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%"   stop-color="hsl(270, 85%, 65%)" />
+          <stop offset="50%"  stop-color="hsl(330, 90%, 60%)" />
+          <stop offset="100%" stop-color="hsl(20,  95%, 60%)" />
+        </linearGradient>
+      </defs>
+
+      <circle
+        class="coil-track"
+        r="56" cx="64" cy="64"
+      />
+
+      <path
+        class="coil-strand"
+        d="M92,15.492S78.194,4.967,66.743,16.887
+           c-17.231,17.938-28.26,96.974-28.26,96.974
+           L119.85,59.892l-99-31.588,57.528,89.832
+           L97.8,19.349,13.636,88.51l89.012,16.015
+           S81.908,38.332,66.1,22.337
+           C50.114,6.156,36,15.492,36,15.492
+           a56,56,0,1,0,56,0Z"
+      />
+    </svg>
+  </main>
+</body>
+</html>
