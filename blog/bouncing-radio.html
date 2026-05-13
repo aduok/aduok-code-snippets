@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Worm Radio</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hind:wght@600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      border: 0;
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      font-size: clamp(32px, calc(32px + 8 * (100vw - 320px) / 704), 40px);
+      --accent:      #008BD9;
+      --shadow:      rgba(0, 0, 0, 0.2);
+      --worm-dur:    0.4s;
+      --radio-dur:   0.2s;
+      --ease-smooth: cubic-bezier(0.45, 0.05, 0.55, 0.95);
+      --ease-bounce: cubic-bezier(0.5, 0, 0.5, 2);
+    }
+
+    body {
+      background: #EBF5FC;
+      color: #0A2540;
+      display: flex;
+      font: 1em 'Hind', sans-serif;
+      height: 100vh;
+      line-height: 1.5;
+      padding: 1.5em 0;
+    }
+
+    .picker {
+      display: block;
+      margin: auto;
+      max-width: 10em;
+      position: relative;
+    }
+
+    .picker-input {
+      position: fixed;
+      top: -1.5em;
+      left: -1.5em;
+      opacity: 0;
+    }
+
+    .picker-label {
+      cursor: pointer;
+      display: block;
+      font-weight: bold;
+      text-shadow: 0 0.1em 0.1em var(--shadow);
+      transition: color var(--radio-dur) var(--ease-smooth);
+    }
+
+    .picker-label:not(:last-of-type) {
+      margin-bottom: 1.5em;
+    }
+
+    .picker-ring {
+      border-radius: 50%;
+      box-shadow:
+        0 0 0 0.2em currentColor inset,
+        0 0.2em 0.2em var(--shadow),
+        0 0.3em 0.2em var(--shadow) inset;
+      display: inline-block;
+      height: 1.5em;
+      margin-right: 0.5em;
+      vertical-align: bottom;
+      width: 1.5em;
+      transition:
+        transform var(--radio-dur) var(--ease-bounce),
+        box-shadow var(--radio-dur) var(--ease-smooth),
+        color var(--radio-dur) var(--ease-smooth);
+    }
+
+    /* Dot + label color — inherit from currentColor like the original */
+    .picker-input:checked + .picker-label,
+    .picker-input:checked + .picker-label .picker-ring,
+    .trail-dot::before {
+      color: var(--accent);
+    }
+
+    .picker-input:checked + .picker-label,
+    .picker-input:checked + .picker-label .picker-ring {
+      transition-delay: var(--worm-dur);
+    }
+
+    .picker-input:checked + .picker-label .picker-ring {
+      transform: scale(1.2);
+    }
+
+    /* ── Trail ── */
+    .trail {
+      position: absolute;
+      top: 0.375em;
+      left: 0.375em;
+    }
+
+    .trail-dot {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 0.75em;
+      height: 0.75em;
+      transition: transform var(--worm-dur) var(--ease-smooth);
+    }
+
+    .trail-dot::before {
+      animation-duration: var(--worm-dur);
+      animation-timing-function: var(--ease-smooth);
+      background: currentColor;
+      border-radius: 50%;
+      content: "";
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .trail-dot:first-child::before,
+    .trail-dot:last-child::before {
+      box-shadow: 0 0 1em 0 currentColor;
+    }
+
+    /* Per-radio states — separate keyframe names force animation restart on every pick */
+    .picker-input:nth-of-type(1):checked ~ .trail .trail-dot       { transform: translateY(0em); }
+    .picker-input:nth-of-type(1):checked ~ .trail .trail-dot::before { animation-name: hop1; }
+
+    .picker-input:nth-of-type(2):checked ~ .trail .trail-dot       { transform: translateY(3em); }
+    .picker-input:nth-of-type(2):checked ~ .trail .trail-dot::before { animation-name: hop2; }
+
+    .picker-input:nth-of-type(3):checked ~ .trail .trail-dot       { transform: translateY(6em); }
+    .picker-input:nth-of-type(3):checked ~ .trail .trail-dot::before { animation-name: hop3; }
+
+    /* Three identical keyframes with unique names — browser restarts animation on each name change */
+    @keyframes hop1 { from, to { transform: translateX(0); } 50% { transform: translateX(-1.5em); } }
+    @keyframes hop2 { from, to { transform: translateX(0); } 50% { transform: translateX(-1.5em); } }
+    @keyframes hop3 { from, to { transform: translateX(0); } 50% { transform: translateX(-1.5em); } }
+
+    @media (prefers-color-scheme: dark) {
+      body { background: #071828; color: #D6EEF8; }
+      :root { --accent: #33A3E0; }
+    }
+  </style>
+</head>
+<body>
+
+  <form class="picker">
+    <input class="picker-input" id="opt-a" type="radio" name="choice" value="a" checked>
+    <label class="picker-label" for="opt-a"><span class="picker-ring"></span>A</label>
+
+    <input class="picker-input" id="opt-b" type="radio" name="choice" value="b">
+    <label class="picker-label" for="opt-b"><span class="picker-ring"></span>B</label>
+
+    <input class="picker-input" id="opt-c" type="radio" name="choice" value="c">
+    <label class="picker-label" for="opt-c"><span class="picker-ring"></span>C</label>
+
+    <div class="trail" aria-hidden="true" id="trail"></div>
+  </form>
+
+  <script>
+    (() => {
+      const DOT_COUNT = 30;
+      const WORM_DUR  = 0.4; // must match --worm-dur
+      const trail     = document.getElementById('trail');
+      const fragment  = document.createDocumentFragment();
+
+      // Build dots with exact per-dot delays stamped as inline styles
+      for (let i = 0; i < DOT_COUNT; i++) {
+        const dot   = document.createElement('div');
+        const delay = parseFloat(((WORM_DUR / 100) * i).toFixed(4));
+
+        dot.className              = 'trail-dot';
+        dot.style.transitionDelay  = `${delay}s`;
+        dot.dataset.dotIndex       = i;
+
+        fragment.appendChild(dot);
+      }
+
+      trail.appendChild(fragment);
+
+      // Inject ::before animation-delay rules — can't set pseudo via inline style
+      const rules = Array.from({ length: DOT_COUNT }, (_, i) => {
+        const delay = parseFloat(((WORM_DUR / 100) * i).toFixed(4));
+        return `.trail-dot[data-dot-index="${i}"]::before { animation-delay: ${delay}s; }`;
+      }).join('\n');
+
+      const styleEl       = document.createElement('style');
+      styleEl.textContent = rules;
+      document.head.appendChild(styleEl);
+    })();
+  </script>
+
+</body>
+</html>
