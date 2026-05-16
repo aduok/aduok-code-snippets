@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blue Bouncing Loader</title>
+  <style>
+    :root {
+      --loader-width: 200px;
+      --loader-height: 60px;
+      --dot-size: 20px;
+      --dot-base: #ffffff;
+      --dot-highlight: #ffffff;
+      --bg-start: #000000;
+      --bg-end: #000000;
+      --shadow-color: rgba(255, 255, 255, 0.35);
+      --shadow-blur: 1px;
+      --cycle: 0.5s;
+      --ease: ease;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at top, var(--bg-end), var(--bg-start) 60%);
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .loader {
+      width: var(--loader-width);
+      height: var(--loader-height);
+      position: relative;
+      z-index: 1;
+    }
+
+    .loader__dot {
+      width: var(--dot-size);
+      height: var(--dot-size);
+      position: absolute;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--dot-highlight), var(--dot-base));
+      left: 15%;
+      transform-origin: 50%;
+      animation: bounce-dot var(--cycle) alternate infinite var(--ease);
+      box-shadow: 0 1px 10px rgba(0, 163, 255, 0.35);
+    }
+
+    @keyframes bounce-dot {
+      0% {
+        top: 60px;
+        height: 5px;
+        border-radius: 50px 50px 25px 25px;
+        transform: scaleX(1.7);
+      }
+
+      40% {
+        height: 20px;
+        border-radius: 50%;
+        transform: scaleX(1);
+      }
+
+      100% {
+        top: 0%;
+      }
+    }
+
+    .loader__dot:nth-child(2) {
+      left: 45%;
+      animation-delay: 0.2s;
+    }
+
+    .loader__dot:nth-child(3) {
+      left: auto;
+      right: 15%;
+      animation-delay: 0.3s;
+    }
+
+    .loader__shadow {
+      width: var(--dot-size);
+      height: 4px;
+      border-radius: 50%;
+      background: var(--shadow-color);
+      position: absolute;
+      top: 62px;
+      transform-origin: 50%;
+      z-index: -1;
+      left: 15%;
+      filter: blur(var(--shadow-blur));
+      animation: bounce-shadow var(--cycle) alternate infinite var(--ease);
+    }
+
+    @keyframes bounce-shadow {
+      0% {
+        transform: scaleX(1.5);
+      }
+
+      40% {
+        transform: scaleX(1);
+        opacity: .7;
+      }
+
+      100% {
+        transform: scaleX(.2);
+        opacity: .4;
+      }
+    }
+
+    .loader__shadow:nth-child(4) {
+      left: 45%;
+      animation-delay: 0.2s;
+    }
+
+    .loader__shadow:nth-child(5) {
+      left: auto;
+      right: 15%;
+      animation-delay: 0.3s;
+    }
+  </style>
+</head>
+<body>
+  <div class="loader" role="status" aria-label="Loading">
+    <div class="loader__dot"></div>
+    <div class="loader__dot"></div>
+    <div class="loader__dot"></div>
+    <div class="loader__shadow"></div>
+    <div class="loader__shadow"></div>
+    <div class="loader__shadow"></div>
+  </div>
+</body>
+</html>
