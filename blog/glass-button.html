@@ -1,0 +1,250 @@
+
+<style>
+  @property --border-angle {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: -75deg;
+  }
+  @property --shine-angle {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: -45deg;
+  }
+
+  .glass-scene {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    min-height: 260px;
+    font-size: clamp(2rem, 4vw, 5rem);
+    font-family: "Inter", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: rgba(215, 215, 215, 1);
+    background-image: radial-gradient(circle, rgba(100,100,100,0.3) 1.5px, transparent 1.5px);
+    background-size: 20px 20px;
+    border-radius: 12px;
+    overflow: hidden;
+    box-sizing: border-box;
+    --ease: cubic-bezier(0.25, 1, 0.5, 1);
+    --dur: 400ms;
+    --bw: clamp(1px, 0.0625em, 4px);
+  }
+
+  .glass-btn-wrapper {
+    position: relative;
+    z-index: 2;
+    border-radius: 999vw;
+    background: transparent;
+    pointer-events: none;
+    transition: all var(--dur) var(--ease);
+  }
+  .glass-btn-wrapper:has(.glass-btn:active) {
+    transform: rotate3d(1, 0, 0, 25deg);
+  }
+
+  .glass-btn-shadow {
+    --cutoff: 2em;
+    position: absolute;
+    width: calc(100% + var(--cutoff));
+    height: calc(100% + var(--cutoff));
+    top: calc(0% - var(--cutoff) / 2);
+    left: calc(0% - var(--cutoff) / 2);
+    filter: blur(clamp(2px, 0.125em, 12px));
+    overflow: visible;
+    pointer-events: none;
+  }
+  .glass-btn-shadow::after {
+    content: "";
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    border-radius: 999vw;
+    background: linear-gradient(180deg, rgba(0,0,0,0.2), rgba(0,0,0,0.1));
+    width: calc(100% - var(--cutoff) - 0.25em);
+    height: calc(100% - var(--cutoff) - 0.25em);
+    top: calc(var(--cutoff) - 0.5em);
+    left: calc(var(--cutoff) - 0.875em);
+    padding: 0.125em;
+    box-sizing: border-box;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    transition: all var(--dur) var(--ease);
+    opacity: 1;
+  }
+
+  .glass-btn-wrapper:has(.glass-btn:hover) .glass-btn-shadow {
+    filter: blur(clamp(2px, 0.0625em, 6px));
+    transition: filter var(--dur) var(--ease);
+  }
+  .glass-btn-wrapper:has(.glass-btn:hover) .glass-btn-shadow::after {
+    top: calc(var(--cutoff) - 0.875em);
+    opacity: 1;
+  }
+  .glass-btn-wrapper:has(.glass-btn:active) .glass-btn-shadow {
+    filter: blur(clamp(2px, 0.125em, 12px));
+  }
+  .glass-btn-wrapper:has(.glass-btn:active) .glass-btn-shadow::after {
+    top: calc(var(--cutoff) - 0.5em);
+    opacity: 0.75;
+  }
+
+  .glass-btn {
+    all: unset;
+    cursor: pointer;
+    position: relative;
+    -webkit-tap-highlight-color: rgba(0,0,0,0);
+    pointer-events: auto;
+    z-index: 3;
+    border-radius: 999vw;
+    background: linear-gradient(
+      -75deg,
+      rgba(255,255,255,0.05),
+      rgba(255,255,255,0.2),
+      rgba(255,255,255,0.05)
+    );
+    box-shadow:
+      inset 0 0.125em 0.125em rgba(0,0,0,0.05),
+      inset 0 -0.125em 0.125em rgba(255,255,255,0.5),
+      0 0.25em 0.125em -0.125em rgba(0,0,0,0.2),
+      0 0 0.1em 0.25em inset rgba(255,255,255,0.2),
+      0 0 0 0 rgba(255,255,255,1);
+    -webkit-backdrop-filter: blur(clamp(1px, 0.125em, 4px));
+    backdrop-filter: blur(clamp(1px, 0.125em, 4px));
+    transition: all var(--dur) var(--ease), --border-angle 500ms ease;
+  }
+  .glass-btn:hover {
+    transform: scale(0.975);
+    -webkit-backdrop-filter: blur(0.01em);
+    backdrop-filter: blur(0.01em);
+    box-shadow:
+      inset 0 0.125em 0.125em rgba(0,0,0,0.05),
+      inset 0 -0.125em 0.125em rgba(255,255,255,0.5),
+      0 0.15em 0.05em -0.1em rgba(0,0,0,0.25),
+      0 0 0.05em 0.1em inset rgba(255,255,255,0.5),
+      0 0 0 0 rgba(255,255,255,1);
+  }
+  .glass-btn:active {
+    box-shadow:
+      inset 0 0.125em 0.125em rgba(0,0,0,0.05),
+      inset 0 -0.125em 0.125em rgba(255,255,255,0.5),
+      0 0.125em 0.125em -0.125em rgba(0,0,0,0.2),
+      0 0 0.1em 0.25em inset rgba(255,255,255,0.2),
+      0 0.225em 0.05em 0 rgba(0,0,0,0.05),
+      0 0.25em 0 0 rgba(255,255,255,0.75),
+      inset 0 0.25em 0.05em 0 rgba(0,0,0,0.15);
+  }
+
+  .glass-btn::after {
+    content: "";
+    position: absolute;
+    z-index: 1;
+    inset: 0;
+    border-radius: 999vw;
+    width: calc(100% + var(--bw));
+    height: calc(100% + var(--bw));
+    top: calc(0% - var(--bw) / 2);
+    left: calc(0% - var(--bw) / 2);
+    padding: var(--bw);
+    box-sizing: border-box;
+    background:
+      conic-gradient(
+        from var(--border-angle) at 50% 50%,
+        rgba(0,0,0,0.5),
+        rgba(0,0,0,0) 5% 40%,
+        rgba(0,0,0,0.5) 50%,
+        rgba(0,0,0,0) 60% 95%,
+        rgba(0,0,0,0.5)
+      ),
+      linear-gradient(180deg, rgba(255,255,255,0.5), rgba(255,255,255,0.5));
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    transition: all var(--dur) var(--ease), --border-angle 500ms ease;
+    box-shadow: inset 0 0 0 calc(var(--bw) / 2) rgba(255,255,255,0.5);
+  }
+  .glass-btn:hover::after  { --border-angle: -125deg; }
+  .glass-btn:active::after { --border-angle: -75deg; }
+
+  @media (hover: none) and (pointer: coarse) {
+    .glass-btn::after,
+    .glass-btn:hover::after,
+    .glass-btn:active::after { --border-angle: -75deg; }
+  }
+
+  .glass-btn__label {
+    position: relative;
+    display: block;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    font-family: "Inter", sans-serif;
+    letter-spacing: -0.05em;
+    font-weight: 500;
+    font-size: 1em;
+    color: rgba(50,50,50,1);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-shadow: 0em 0.25em 0.05em rgba(0,0,0,0.1);
+    padding-inline: 1.5em;
+    padding-block: 0.875em;
+    transition: all var(--dur) var(--ease);
+  }
+  .glass-btn:hover .glass-btn__label {
+    text-shadow: 0.025em 0.025em 0.025em rgba(0,0,0,0.12);
+  }
+  .glass-btn:active .glass-btn__label {
+    text-shadow: 0.025em 0.25em 0.05em rgba(0,0,0,0.12);
+  }
+
+  .glass-btn__label::after {
+    content: "";
+    display: block;
+    position: absolute;
+    z-index: 3;
+    width: calc(100% - var(--bw));
+    height: calc(100% - var(--bw));
+    top: calc(0% + var(--bw) / 2);
+    left: calc(0% + var(--bw) / 2);
+    box-sizing: border-box;
+    border-radius: 999vw;
+    overflow: clip;
+    background: linear-gradient(
+      var(--shine-angle),
+      rgba(255,255,255,0) 0%,
+      rgba(255,255,255,0.5) 40% 50%,
+      rgba(255,255,255,0) 55%
+    );
+    mix-blend-mode: screen;
+    pointer-events: none;
+    background-size: 200% 200%;
+    background-position: 0% 50%;
+    background-repeat: no-repeat;
+    transition:
+      background-position calc(var(--dur) * 1.25) var(--ease),
+      --shine-angle calc(var(--dur) * 1.25) var(--ease);
+  }
+  .glass-btn:hover .glass-btn__label::after {
+    background-position: 25% 50%;
+  }
+  .glass-btn:active .glass-btn__label::after {
+    background-position: 50% 15%;
+    --shine-angle: -15deg;
+  }
+
+  @media (hover: none) and (pointer: coarse) {
+    .glass-btn__label::after,
+    .glass-btn:active .glass-btn__label::after { --shine-angle: -45deg; }
+  }
+</style>
+
+<div class="glass-scene">
+  <div class="glass-btn-wrapper">
+    <button class="glass-btn">
+      <span class="glass-btn__label">Glass Button</span>
+    </button>
+    <div class="glass-btn-shadow"></div>
+  </div>
+</div>
