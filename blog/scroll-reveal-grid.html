@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scroll Reveal Grid</title>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{--gap:clamp(8px,4vw,56px);--gutter:2rem}
+@media(max-width:600px){:root{--gutter:1rem}}
+
+html,body{margin:0;padding:0;height:100%;overflow:hidden}
+body{
+  font-family:'SF Pro Text','Helvetica Neue',Arial,sans-serif;
+  background:#080808;color:#fff;
+}
+
+.scroll-root{
+  height:100vh;
+  overflow-y:scroll;
+  overflow-x:hidden;
+  background:#080808;
+}
+
+.scroll-section{min-height:240vh;position:relative}
+
+.sticky-canvas{
+  min-height:100vh;width:100%;
+  display:flex;place-items:center;align-content:center;
+  position:sticky;top:0;overflow:hidden;
+}
+
+.outro-section{
+  min-height:100vh;display:grid;
+  place-items:center;padding:2rem;
+}
+
+.brand-title{
+  font-size:clamp(0.6rem,2.5vw,1.8rem);
+  letter-spacing:0.3em;text-transform:uppercase;
+  color:#666;margin:0;font-weight:300;
+}
+
+/* ── Grid ── */
+.photo-grid{
+  --offset:0;
+  width:1600px;
+  max-width:calc(100% - (2 * var(--gutter)));
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  grid-template-rows:repeat(3,auto);
+  gap:var(--gap);
+  margin:0 auto;
+  align-content:center;
+  position:absolute;top:50%;left:50%;
+  translate:-50% -50%;
+}
+
+@media(max-width:600px){
+  .photo-grid{grid-template-columns:repeat(3,1fr);--offset:-1}
+  .photo-grid>.col-ring:nth-of-type(1){display:none}
+}
+
+.photo-grid>.col-ring{
+  display:grid;
+  grid-column:1/-1;grid-row:1/-1;
+  grid-template-columns:subgrid;
+  grid-template-rows:subgrid;
+}
+
+.photo-grid>.col-ring:nth-of-type(1) div:nth-of-type(odd){grid-column:1}
+.photo-grid>.col-ring:nth-of-type(1) div:nth-of-type(even){grid-column:-2}
+.photo-grid>.col-ring:nth-of-type(2) div:nth-of-type(odd){grid-column:calc(2 + var(--offset))}
+.photo-grid>.col-ring:nth-of-type(2) div:nth-of-type(even){grid-column:calc(-3 - var(--offset))}
+.photo-grid>.col-ring:nth-of-type(3) div:first-of-type{grid-column:calc(3 + var(--offset));grid-row:1}
+.photo-grid>.col-ring:nth-of-type(3) div:last-of-type{grid-column:calc(3 + var(--offset));grid-row:-1}
+
+.photo-grid img{
+  width:100%;aspect-ratio:4/5;
+  object-fit:cover;border-radius:0.75rem;display:block;
+}
+
+/* ── Hero cell ── */
+.hero-cell{
+  position:relative;
+  grid-area:2 / calc(3 + var(--offset));
+  z-index:2;width:100%;height:100%;
+}
+.hero-cell img{
+  position:absolute;top:50%;left:50%;
+  translate:-50% -50%;
+  object-fit:cover;border-radius:0.75rem;
+  /* JS drives width/height via inline style */
+  will-change:width,height;
+}
+
+/* ── Rings: JS drives --ring-scale and --ring-opacity via inline style ── */
+.col-ring{
+  opacity:var(--ring-opacity,0);
+  scale:var(--ring-scale,0);
+  will-change:opacity,transform;
+}
+
+@media(prefers-reduced-motion:reduce){
+  .col-ring{opacity:1!important;scale:1!important}
+  .hero-cell img{width:100%!important;height:100%!important}
+}
+</style>
+</head>
+<body>
+<div class="scroll-root" id="scroll-root">
+  <main>
+    <section class="scroll-section" id="scroll-section">
+      <div class="sticky-canvas">
+        <div class="photo-grid" id="photo-grid">
+
+          <div class="col-ring">
+            <div><img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&auto=format&fit=crop&q=60" alt="Mountain landscape" loading="lazy"></div>
+            <div><img src="https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800&auto=format&fit=crop&q=60" alt="Sunset hills" loading="lazy"></div>
+            <div><img src="https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=800&auto=format&fit=crop&q=60" alt="Forest path" loading="lazy"></div>
+            <div><img src="https://images.unsplash.com/photo-1433086966358-54859d0ed716?w=800&auto=format&fit=crop&q=60" alt="Waterfall" loading="lazy"></div>
+            <div><img src="https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=800&auto=format&fit=crop&q=60" alt="Desert dunes" loading="lazy"></div>
+            <div><img src="https://images.unsplash.com/photo-1501854140801-50d01698950b?w=800&auto=format&fit=crop&q=60" alt="Aerial cliffs" loading="lazy"></div>
+          </div>
+
+          <div class="col-ring">
+            <div><img src="https://images.unsplash.com/photo-1519681393784-d120267933ba?w=800&auto=format&fit=crop&q=60" alt="Snowy peaks" loading="lazy"></div>
+            <div><img src="https://images.unsplash.com/photo-1426604966848-d7adac402bff?w=800&auto=format&fit=crop&q=60" alt="Misty valley" loading="lazy"></div>
+            <div><img src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&auto=format&fit=crop&q=60" alt="Rocky ridge" loading="lazy"></div>
+            <div><img src="https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=800&auto=format&fit=crop&q=60" alt="Aurora night" loading="lazy"></div>
+            <div><img src="https://images.unsplash.com/photo-1470770841072-f978cf4d019e?w=800&auto=format&fit=crop&q=60" alt="Lake reflection" loading="lazy"></div>
+            <div><img src="https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&auto=format&fit=crop&q=60" alt="Deep forest" loading="lazy"></div>
+          </div>
+
+          <div class="col-ring">
+            <div><img src="https://images.unsplash.com/photo-1682687220063-4742bd7fd538?w=800&auto=format&fit=crop&q=80" alt="Green meadow" loading="lazy"></div>
+            <div><img src="https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=800&auto=format&fit=crop&q=60" alt="Coastal cliffs" loading="lazy"></div>
+          </div>
+
+          <div class="hero-cell">
+            <img id="hero-img"
+              src="https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=800&auto=format&fit=crop&q=60"
+              alt="Hero landscape">
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <section class="outro-section">
+      <h2 class="brand-title">explore the wild.</h2>
+    </section>
+  </main>
+</div>
+
+<script>
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+
+  const scroller = document.getElementById('scroll-root');
+  const section  = document.getElementById('scroll-section');
+  const heroImg  = document.getElementById('hero-img');
+  const rings    = document.querySelectorAll('.col-ring');
+
+  // Cubic bezier easing — same curves as the original
+  function makeCubic(x1, y1, x2, y2) {
+    // Newton-Raphson sampling of a cubic bezier
+    return function ease(t) {
+      if (t <= 0) return 0;
+      if (t >= 1) return 1;
+      let cx = 3*x1, bx = 3*(x2-x1)-cx, ax = 1-cx-bx;
+      let cy = 3*y1, by = 3*(y2-y1)-cy, ay = 1-cy-by;
+      function sampleX(t){ return ((ax*t+bx)*t+cx)*t }
+      function sampleY(t){ return ((ay*t+by)*t+cy)*t }
+      function dSampleX(t){ return (3*ax*t+2*bx)*t+cx }
+      // find t for given x using Newton-Raphson
+      let st = t;
+      for (let i = 0; i < 8; i++) {
+        let x = sampleX(st) - t;
+        let d = dSampleX(st);
+        if (Math.abs(d) < 1e-6) break;
+        st -= x / d;
+      }
+      return sampleY(st);
+    };
+  }
+
+  const easeHeroW  = makeCubic(0.65, 0, 0.35, 1);
+  const easeHeroH  = makeCubic(0.42, 0, 0.58, 1);
+  const easeFade   = makeCubic(0.61, 1, 0.88, 1);
+  const easeRings  = [
+    makeCubic(0.42, 0, 0.58, 1),
+    makeCubic(0.76, 0, 0.24, 1),
+    makeCubic(0.87, 0, 0.13, 1),
+  ];
+
+  // lerp helper
+  const lerp = (a, b, t) => a + (b - a) * t;
+
+  // Map a raw progress value through a sub-range to [0,1]
+  function subProgress(p, start, end) {
+    return Math.max(0, Math.min(1, (p - start) / (end - start)));
+  }
+
+  let vw, vh, nw, nh;
+
+  function measure() {
+    vw = scroller.clientWidth;
+    vh = scroller.clientHeight;
+    // Temporarily reset so we can measure natural size
+    heroImg.style.width  = '';
+    heroImg.style.height = '';
+    nw = heroImg.offsetWidth;
+    nh = heroImg.offsetHeight;
+  }
+
+  function onScroll() {
+    const sectionH   = section.offsetHeight;
+    const scrollable = sectionH - vh;
+    const raw        = Math.max(0, Math.min(scroller.scrollTop, scrollable));
+    const p          = raw / scrollable; // 0 → 1 over the section
+
+    // ── Hero: progress over [0, 0.8] of total scroll
+    const heroP = subProgress(p, 0, 0.8);
+    heroImg.style.width  = lerp(vw, nw, easeHeroW(heroP)) + 'px';
+    heroImg.style.height = lerp(vh, nh, easeHeroH(heroP)) + 'px';
+
+    // ── Rings: each ends at 1.0, 0.95, 0.90 of scroll
+    rings.forEach((ring, i) => {
+      const endFrac = 1 - i * 0.05;
+      const rp      = subProgress(p, 0, endFrac);
+
+      // Opacity: hold at 0 until 55% of ring's own progress
+      const fadeP  = subProgress(rp, 0.55, 1);
+      const scaleP = subProgress(rp, 0.30, 1);
+
+      ring.style.setProperty('--ring-opacity', easeFade(fadeP));
+      ring.style.setProperty('--ring-scale',   easeRings[i](scaleP));
+    });
+  }
+
+  // Init after first paint
+  requestAnimationFrame(() => {
+    measure();
+    onScroll();
+    scroller.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', () => { measure(); onScroll(); });
+  });
+}
+</script>
+</body>
+</html>
