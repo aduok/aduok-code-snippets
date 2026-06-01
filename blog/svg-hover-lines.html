@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SVG Hover Lines</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #e8e0f0;
+    }
+
+    .btn-wrap {
+      position: relative;
+      width: 120px;
+      height: 40px;
+      transform: scale(3);
+    }
+
+    .btn-wrap a {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      font-family: "Bebas Neue", sans-serif;
+      font-size: 22px;
+      letter-spacing: 0.12em;
+      color: #e8e0f0;
+      transition: transform 0.3s, color 0.3s;
+    }
+
+    .btn-wrap a:hover {
+      transform: scale(1.1);
+      color: #7c3aed;
+    }
+
+    .btn-wrap svg {
+      position: absolute;
+      inset: 0;
+      overflow: visible;
+    }
+
+    .btn-wrap svg line {
+      stroke: #7c3aed;
+      stroke-width: 1px;
+      transform-origin: 50% 0%;
+      transition: transform 0.3s, opacity 0.3s;
+    }
+
+    .btn-wrap a:hover ~ svg line:nth-child(odd) {
+      transform: scaleY(1.2);
+      opacity: 0.15;
+    }
+
+    .btn-wrap a:hover ~ svg line:nth-child(even) {
+      transform: scaleY(-0.2) translateX(-1px);
+      opacity: 0.15;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="btn-wrap">
+    <a href="#">ADUOK</a>
+    <svg id="lineSvg" viewBox="0 0 120 40" preserveAspectRatio="none" width="120" height="40"></svg>
+  </div>
+
+  <script>
+    const svg = document.getElementById('lineSvg');
+    const total = 120;
+
+    for (let i = 1; i <= total; i++) {
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', i);
+      line.setAttribute('x2', i);
+      line.setAttribute('y1', 0);
+      line.setAttribute('y2', 40);
+      line.style.transitionDelay = `${((i * 0.3) / total).toFixed(5)}s`;
+      svg.appendChild(line);
+    }
+  </script>
+
+</body>
+</html>
