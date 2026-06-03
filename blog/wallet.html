@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wallet</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: #f5ede3;
+        font-family: 'Syne', sans-serif;
+      }
+
+      /* ── Page wrapper ── */
+      .wallet-page {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 36px;
+      }
+
+      .wallet-hint {
+        font-family: 'Syne', sans-serif;
+        font-size: 12px;
+        font-style: italic;
+        font-weight: 600;
+        color: #8b5e3c;
+        text-decoration: underline;
+        letter-spacing: 0.4px;
+      }
+
+      /* ── Scene (perspective wrapper) ── */
+      .wallet-scene {
+        position: relative;
+        width: 280px;
+        height: 230px;
+        cursor: pointer;
+        perspective: 1000px;
+        display: flex;
+        justify-content: center;
+        align-items: flex-end;
+        transition: transform 0.4s ease;
+      }
+
+      /* ── Wallet shell (back piece) ── */
+      .wallet-shell {
+        position: absolute;
+        bottom: 0;
+        width: 280px;
+        height: 200px;
+        background: #3b1f0e;
+        border-radius: 22px 22px 60px 60px;
+        z-index: 5;
+        box-shadow:
+          inset 0 25px 35px rgba(0, 0, 0, 0.45),
+          inset 0 5px 15px rgba(0, 0, 0, 0.35);
+      }
+
+      /* ── Card drop-in animation ── */
+      @keyframes wallet-card-drop {
+        0% {
+          transform: translateY(-100px);
+          opacity: 0;
+        }
+        100% {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+
+      /* ── Base card ── */
+      .wallet-card {
+        position: absolute;
+        width: 260px;
+        height: 140px;
+        left: 10px;
+        border-radius: 16px;
+        padding: 16px 18px;
+        transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        animation: wallet-card-drop 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+      }
+
+      .wallet-card__inner {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        height: 100%;
+      }
+
+      .wallet-card__header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        font-weight: 700;
+        font-family: 'Syne', sans-serif;
+      }
+
+      .wallet-card__chip {
+        width: 32px;
+        height: 24px;
+        border-radius: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.15);
+      }
+
+      .wallet-card__footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+      }
+
+      .wallet-card__meta-label {
+        font-size: 8px;
+        opacity: 0.65;
+        text-transform: uppercase;
+        margin-bottom: 3px;
+        display: block;
+        letter-spacing: 1px;
+        font-family: 'Syne', sans-serif;
+      }
+
+      .wallet-card__meta-value {
+        font-size: 10px;
+        font-weight: 700;
+        font-family: 'Syne', sans-serif;
+        letter-spacing: 0.5px;
+      }
+
+      .wallet-card__pan-wrap {
+        text-align: right;
+        font-family: 'Space Mono', monospace;
+      }
+
+      .wallet-card__pan-masked {
+        font-size: 15px;
+        letter-spacing: 2px;
+        opacity: 0.9;
+      }
+
+      .wallet-card__pan-full {
+        display: none;
+        font-size: 12px;
+        letter-spacing: 1px;
+      }
+
+      /* ── Card variants ── */
+      .wallet-card--stripe {
+        background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+        color: #e8e0ff;
+        bottom: 90px;
+        z-index: 10;
+        animation-delay: 0.1s;
+        box-shadow:
+          0 8px 32px rgba(50, 30, 120, 0.4),
+          inset 0 1px 1px rgba(255, 255, 255, 0.15);
+      }
+
+      .wallet-card--stripe .wallet-card__chip {
+        background: rgba(180, 160, 255, 0.2);
+        border-color: rgba(180, 160, 255, 0.3);
+      }
+
+      .wallet-card--wise {
+        background: linear-gradient(135deg, #004d40, #00695c, #00897b);
+        color: #e0f2f1;
+        bottom: 65px;
+        z-index: 20;
+        animation-delay: 0.2s;
+        box-shadow:
+          0 8px 32px rgba(0, 80, 70, 0.4),
+          inset 0 1px 1px rgba(255, 255, 255, 0.15);
+      }
+
+      .wallet-card--wise .wallet-card__chip {
+        background: rgba(160, 230, 220, 0.2);
+        border-color: rgba(160, 230, 220, 0.3);
+      }
+
+      .wallet-card--paypal {
+        background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+        color: #c8d8f0;
+        bottom: 40px;
+        z-index: 30;
+        animation-delay: 0.3s;
+        box-shadow:
+          0 8px 32px rgba(10, 30, 80, 0.4),
+          inset 0 1px 1px rgba(255, 255, 255, 0.12);
+      }
+
+      .wallet-card--paypal .wallet-card__chip {
+        background: rgba(150, 180, 240, 0.2);
+        border-color: rgba(150, 180, 240, 0.3);
+      }
+
+      .wallet-card--paypal .wallet-card__meta-label {
+        color: rgba(200, 216, 240, 0.55);
+      }
+
+      /* ── Pocket (front flap) ── */
+      .wallet-pocket {
+        position: absolute;
+        bottom: 0;
+        width: 280px;
+        height: 160px;
+        z-index: 40;
+      }
+
+      .wallet-pocket__body {
+        position: absolute;
+        top: 44px;
+        width: 100%;
+        text-align: center;
+        z-index: 50;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 7px;
+      }
+
+      .wallet-pocket__balance-wrap {
+        position: relative;
+        height: 28px;
+        width: 100%;
+      }
+
+      .wallet-pocket__balance-hidden {
+        color: #a0734e;
+        font-size: 22px;
+        letter-spacing: 5px;
+        transition: 0.3s ease;
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        white-space: nowrap;
+        font-family: 'Space Mono', monospace;
+      }
+
+      .wallet-pocket__balance-real {
+        color: #e8c9a0;
+        font-size: 20px;
+        font-weight: 700;
+        opacity: 0;
+        position: absolute;
+        left: 50%;
+        top: 0;
+        transform: translate(-50%, 10px);
+        transition: 0.3s ease;
+        white-space: nowrap;
+        font-family: 'Space Mono', monospace;
+      }
+
+      .wallet-pocket__label {
+        color: #8b5e3c;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        font-family: 'Syne', sans-serif;
+      }
+
+      /* ── Eye icon ── */
+      .wallet-eye {
+        margin-top: 6px;
+        height: 20px;
+        width: 20px;
+        position: relative;
+        opacity: 0.25;
+        transition: 0.3s;
+      }
+
+      .wallet-eye__icon {
+        position: absolute;
+        top: 0;
+        left: 0;
+        stroke: #c49a6c;
+        transition: 0.3s;
+      }
+
+      .wallet-eye__icon--open {
+        opacity: 0;
+      }
+
+      /* ── Hover interactions ── */
+      .wallet-scene:hover {
+        transform: translateY(-5px);
+      }
+
+      .wallet-scene:hover .wallet-eye {
+        opacity: 1;
+      }
+
+      .wallet-scene:hover .wallet-card--stripe {
+        transform: translateY(-75px) rotate(-3deg);
+      }
+
+      .wallet-scene:hover .wallet-card--wise {
+        transform: translateY(-45px) rotate(2deg);
+      }
+
+      .wallet-scene:hover .wallet-card--paypal {
+        transform: translateY(-10px);
+      }
+
+      .wallet-card:hover {
+        z-index: 100 !important;
+      }
+
+      .wallet-scene:hover .wallet-card--stripe:hover {
+        transform: translateY(-60px) scale(1.05) rotate(0);
+      }
+
+      .wallet-scene:hover .wallet-card--wise:hover {
+        transform: translateY(-70px) scale(1.05) rotate(0);
+      }
+
+      .wallet-scene:hover .wallet-card--paypal:hover {
+        transform: translateY(-60px) scale(1.05) rotate(0);
+      }
+
+      .wallet-card:hover .wallet-card__pan-masked {
+        display: none;
+      }
+
+      .wallet-card:hover .wallet-card__pan-full {
+        display: block;
+      }
+
+      .wallet-scene:hover .wallet-pocket__balance-hidden {
+        opacity: 0;
+      }
+
+      .wallet-scene:hover .wallet-pocket__balance-real {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+
+      .wallet-scene:hover .wallet-eye__icon--slash {
+        opacity: 0;
+        transform: scale(0.5);
+      }
+
+      .wallet-scene:hover .wallet-eye__icon--open {
+        opacity: 1;
+        transform: scale(1.1);
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="wallet-page">
+
+      <div class="wallet-scene">
+        <div class="wallet-shell"></div>
+
+        <!-- Stripe card -->
+        <div class="wallet-card wallet-card--stripe">
+          <div class="wallet-card__inner">
+            <div class="wallet-card__header">
+              <span>Stripe</span>
+              <div class="wallet-card__chip"></div>
+            </div>
+            <div class="wallet-card__footer">
+              <div>
+                <span class="wallet-card__meta-label">Holder</span>
+                <span class="wallet-card__meta-value">ADUOK</span>
+              </div>
+              <div class="wallet-card__pan-wrap">
+                <span class="wallet-card__pan-masked">**** 7731</span>
+                <span class="wallet-card__pan-full">4819 3302 7731</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Wise card -->
+        <div class="wallet-card wallet-card--wise">
+          <div class="wallet-card__inner">
+            <div class="wallet-card__header">
+              <span>Wise</span>
+              <div class="wallet-card__chip"></div>
+            </div>
+            <div class="wallet-card__footer">
+              <div>
+                <span class="wallet-card__meta-label">Business</span>
+                <span class="wallet-card__meta-value">ADUOK</span>
+              </div>
+              <div class="wallet-card__pan-wrap">
+                <span class="wallet-card__pan-masked">**** 5523</span>
+                <span class="wallet-card__pan-full">7740 8861 5523</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PayPal card -->
+        <div class="wallet-card wallet-card--paypal">
+          <div class="wallet-card__inner">
+            <div class="wallet-card__header">
+              <span>PayPal</span>
+              <div class="wallet-card__chip"></div>
+            </div>
+            <div class="wallet-card__footer">
+              <div>
+                <span class="wallet-card__meta-label">Email</span>
+                <span class="wallet-card__meta-value">hi@aduok.in</span>
+              </div>
+              <div class="wallet-card__pan-wrap">
+                <span class="wallet-card__pan-masked">**** 3387</span>
+                <span class="wallet-card__pan-full">2251 9904 3387</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pocket / front flap -->
+        <div class="wallet-pocket">
+          <svg viewBox="0 0 280 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M0 20C0 10 5 10 10 10C20 10 25 25 40 25L240 25C255 25 260 10 270 10C275 10 280 10 280 20L280 120C280 155 260 160 240 160L40 160C20 160 0 155 0 120Z"
+              fill="#3b1f0e"
+            />
+            <path
+              d="M8 22C8 16 12 16 15 16C23 16 27 29 40 29L240 29C253 29 257 16 265 16C268 16 272 16 272 22L272 120C272 150 255 152 240 152L40 152C25 152 8 152 8 120Z"
+              stroke="#6b3a1f"
+              stroke-width="1.5"
+              stroke-dasharray="6 4"
+            />
+          </svg>
+          <div class="wallet-pocket__body">
+            <div class="wallet-pocket__balance-wrap">
+              <div class="wallet-pocket__balance-hidden">******</div>
+              <div class="wallet-pocket__balance-real">$38,920.00</div>
+            </div>
+            <div class="wallet-pocket__label">Total Balance</div>
+            <div class="wallet-eye">
+              <svg
+                class="wallet-eye__icon wallet-eye__icon--slash"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+                <line x1="3" y1="3" x2="21" y2="21" />
+              </svg>
+              <svg
+                class="wallet-eye__icon wallet-eye__icon--open"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wallet-hint">Hover to reveal balance</div>
+
+    </div>
+  </body>
+</html>
