@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FIFA Title Animation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Emoji:wght@400&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-color: #1a1a2e;
+      background-image:
+        radial-gradient(circle at 20% 80%, rgba(0,180,100,0.08) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(0,100,255,0.07) 0%, transparent 50%);
+      gap: 12px;
+      padding: 48px;
+    }
+
+    .wordmark {
+      display: flex;
+      align-items: flex-end;
+      font-family: 'Bebas Neue', Impact, sans-serif;
+      font-size: clamp(80px, 18vw, 160px);
+      line-height: 1;
+      letter-spacing: 6px;
+      color: #fff;
+      user-select: none;
+      padding-top: 80px;
+    }
+
+    .i-wrap {
+      position: relative;
+      display: inline-block;
+    }
+
+    /* I squashes on impact — synced with bounce alternate */
+    .letter-i {
+      display: inline-block;
+      transform-origin: bottom center;
+      animation: squish 0.35s ease both infinite alternate;
+    }
+
+    @keyframes squish {
+      0%   { transform: scaleX(1.2) scaleY(0.75); }
+      45%  { transform: scaleX(1)   scaleY(1);    }
+    }
+
+    /*
+      Mirrors the original exactly:
+        position: absolute; bottom: 100%; left: 50%;
+        bounce: from translate(-50% 100%)  → to translate(-50% 0)
+        rotate: from 0deg → 360deg
+      "from" = ball at top (far from I), "to" = ball landed on I.
+      alternate means it goes down→up→down→up in a loop.
+    */
+    .ball {
+      font-family: 'Noto Emoji', sans-serif;
+
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+
+      --size: 50px;
+      width: var(--size);
+      height: var(--size);
+      font-size: calc(var(--size) * 0.8);
+      margin-bottom: 25px;
+
+      display: flex;
+      justify-content: center;
+      align-items: center;
+
+      animation:
+        ball-rotate 4s    linear   both infinite,
+        ball-bounce 0.35s ease-out both infinite alternate;
+
+      filter: drop-shadow(0 6px 14px rgba(0,0,0,0.6));
+      will-change: transform;
+    }
+
+    @keyframes ball-bounce {
+      from { translate: -50% 100%; }
+      to   { translate: -50% 0;    }
+    }
+
+    @keyframes ball-rotate {
+      from { rotate: 0deg;   }
+      to   { rotate: 360deg; }
+    }
+
+    .rule {
+      width: 56px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #00c86f, transparent);
+    }
+
+    .tagline {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 13px;
+      letter-spacing: 10px;
+      color: rgba(255,255,255,0.28);
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="wordmark" aria-label="FIFA">
+    <span>F</span>
+    <span class="i-wrap">
+      <span class="ball" role="img" aria-label="soccer ball">⚽</span>
+      <span class="letter-i">I</span>
+    </span>
+    <span>FA</span>
+  </div>
+
+  <div class="rule" aria-hidden="true"></div>
+  <p class="tagline">World Football</p>
+
+</body>
+</html>
