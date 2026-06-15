@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Parallax Portrait Gallery</title>
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      height: 100%;
+      background: #0d0d0d;
+      color: #fff;
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+    }
+
+    #stage {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      cursor: grab;
+    }
+
+    #stage.grabbing {
+      cursor: grabbing;
+    }
+
+    #hud {
+      position: fixed;
+      left: 14px;
+      bottom: 14px;
+      z-index: 10;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 12px;
+      color: #aaa;
+      line-height: 1.7;
+    }
+
+    #hud a {
+      color: #88ccff;
+      text-decoration: none;
+    }
+
+    #hud a:hover {
+      color: #fff;
+    }
+
+    #loader {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 20;
+      font-size: 14px;
+      letter-spacing: 0.06em;
+      color: #999;
+    }
+
+    #badge {
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      background: rgba(255, 255, 255, 0.9);
+      color: #111;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      z-index: 10;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="stage"></div>
+  <div id="loader">Loading portraits…</div>
+
+  <div id="hud" style="display:none">
+    Photos from <a href="https://unsplash.com" target="_blank" rel="noopener noreferrer">Unsplash</a><br>
+    <span style="color:#555">Drag or scroll to navigate</span>
+  </div>
+
+  <div id="badge">Parallax Portraits</div>
+
+  <!-- Three.js r128 via CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <script>
+    /* ─────────────────────────────────────────────
+       Constants & Configuration
+    ───────────────────────────────────────────── */
+    const LAYER_COUNT  = 5;
+    const PER_LAYER    = 10;
+    const MAX_DIM      = 160;
+    const TOTAL_NEEDED = LAYER_COUNT * PER_LAYER;
+
+    /** Per-layer visual properties — index 0 = nearest, 4 = furthest */
+    const LAYER_CFG = [
+      { scale: 1.5, speed: 80, opacity: 1.00 },
+      { scale: 1.0, speed: 40, opacity: 0.85 },
+      { scale: 0.8, speed: 30, opacity: 0.70 },
+      { scale: 0.6, speed: 20, opacity: 0.55 },
+      { scale: 0.5, speed: 15, opacity: 0.40 },
+    ];
+
+    /** Portrait image URLs from Unsplash (public, no auth required) */
+    const PORTRAIT_URLS = [
+      'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=200',
+      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200',
+      'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200',
+      'https://images.unsplash.com/photo-1520813792240-56fc4a3765a7?w=200',
+      'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=200',
+      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200',
+      'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200',
+      'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200',
+      'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200',
+      'https://images.unsplash.com/photo-1463453091185-61582044d556?w=200',
+      'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=200',
+      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+      'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200',
+      'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?w=200',
+      'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=200',
+      'https://images.unsplash.com/photo-1521119989659-a83eee488004?w=200',
+      'https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?w=200',
+      'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200',
+      'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=200',
+      'https://images.unsplash.com/photo-1509460913899-515f1df34fea?w=200',
+      'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200',
+      'https://images.unsplash.com/photo-1601233749202-95d04d5b3c00?w=200',
+      'https://images.unsplash.com/photo-1558898479-33c0057a5d12?w=200',
+      'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=200',
+      'https://images.unsplash.com/photo-1596075780750-81249df16d19?w=200',
+    ];
+
+    /* ─────────────────────────────────────────────
+       ImagePool — shuffled, non-repeating image queue
+    ───────────────────────────────────────────── */
+    class ImagePool {
+      constructor(urls) {
+        this._source = urls;
+        this._pool   = [];
+        this._cursor = 0;
+        this._refill();
+      }
+
+      _refill() {
+        this._pool = [...this._source].sort(() => Math.random() - 0.5);
+        this._cursor = 0;
+      }
+
+      next() {
+        if (this._cursor >= this._pool.length) this._refill();
+        return this._pool[this._cursor++];
+      }
+    }
+
+    /* ─────────────────────────────────────────────
+       ParallaxGallery — main scene controller
+    ───────────────────────────────────────────── */
+    class ParallaxGallery {
+      constructor() {
+        this._stage    = document.getElementById('stage');
+        this._loader   = document.getElementById('loader');
+        this._hud      = document.getElementById('hud');
+
+        this._pool     = new ImagePool(PORTRAIT_URLS);
+        this._textures = [];
+        this._layers   = this._emptyLayers();
+        this._loadCount= 0;
+
+        this._lastTime  = 0;
+        this._velocity  = 0;   // current drag/scroll velocity (signed)
+        this._direction = 1;   // last known travel direction: +1 or -1
+
+        this._drag = { active: false, lastX: 0 };
+
+        this._initRenderer();
+        this._initCamera();
+        this._loadTextures();
+        this._bindEvents();
+      }
+
+      /* ── Three.js setup ─────────────────────────── */
+
+      _initRenderer() {
+        this._scene = new THREE.Scene();
+        this._renderer = new THREE.WebGLRenderer({
+          antialias: true,
+          alpha: true,
+          powerPreference: 'high-performance',
+        });
+        this._renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+        this._renderer.setClearColor(0x000000, 0);
+        this._stage.appendChild(this._renderer.domElement);
+      }
+
+      _initCamera() {
+        const { clientWidth: w, clientHeight: h } = this._stage;
+        this._renderer.setSize(w, h);
+        this._camera = new THREE.OrthographicCamera(0, w, h, 0, -1000, 1000);
+        this._camera.position.z = 10;
+      }
+
+      /* ── Texture loading ────────────────────────── */
+
+      _fallbackTexture(layerIdx) {
+        const palette = ['#3d2b56', '#1a3a4a', '#2c1f3e', '#12303d', '#0b1e26'];
+        const canvas  = document.createElement('canvas');
+        canvas.width  = MAX_DIM;
+        canvas.height = MAX_DIM;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = palette[layerIdx % palette.length];
+        ctx.fillRect(0, 0, MAX_DIM, MAX_DIM);
+        return new THREE.CanvasTexture(canvas);
+      }
+
+      _loadTextures() {
+        const loader = new THREE.TextureLoader();
+        loader.crossOrigin = 'anonymous';
+
+        for (let i = 0; i < TOTAL_NEEDED; i++) {
+          const layerIdx = Math.floor(i / PER_LAYER);
+          const url = this._pool.next();
+          loader.load(
+            url,
+            tex => this._onTextureLoaded(tex),
+            undefined,
+            ()  => this._onTextureLoaded(this._fallbackTexture(layerIdx))
+          );
+        }
+      }
+
+      _onTextureLoaded(texture) {
+        this._textures.push(texture);
+        this._loadCount++;
+        const pct = Math.round((this._loadCount / TOTAL_NEEDED) * 100);
+        this._loader.textContent = `Loading portraits… ${pct}%`;
+        if (this._loadCount === TOTAL_NEEDED) this._start();
+      }
+
+      /* ── Scene initialisation ───────────────────── */
+
+      _start() {
+        this._fillViewport();
+        this._loader.style.display = 'none';
+        this._hud.style.display    = 'block';
+        this._lastTime = performance.now();
+        this._tick();
+      }
+
+      _emptyLayers() {
+        return Array.from({ length: LAYER_COUNT }, () => []);
+      }
+
+      _rand(min, max) {
+        return Math.random() * (max - min) + min;
+      }
+
+      _addSprite(layerIdx, rightEdge) {
+        const cfg     = LAYER_CFG[layerIdx];
+        const texture = this._textures[Math.floor(Math.random() * this._textures.length)];
+
+        const mat    = new THREE.SpriteMaterial({ map: texture, transparent: true, opacity: cfg.opacity });
+        const sprite = new THREE.Sprite(mat);
+
+        /* Fit within MAX_DIM while preserving aspect ratio */
+        const img = texture.image;
+        let w = MAX_DIM, h = MAX_DIM;
+        if (img?.width && img?.height) {
+          const ratio = img.width / img.height;
+          ratio > 1 ? (h = MAX_DIM / ratio) : (w = MAX_DIM * ratio);
+        }
+
+        const sizeVar = this._rand(0.85, 1.15);
+        const sw = w * cfg.scale * sizeVar;
+        const sh = h * cfg.scale * sizeVar;
+        const gap = sw * this._rand(0.4, 0.85);
+
+        sprite.scale.set(sw, sh, 1);
+
+        const stageH = this._stage.clientHeight;
+        const baseY  = this._rand(sh / 2, stageH - sh / 2);
+        sprite.position.set(rightEdge + sw / 2 + gap, baseY, -layerIdx * 50);
+
+        sprite.userData = {
+          speed:   cfg.speed * this._rand(0.45, 1.15),
+          w: sw,
+          h: sh,
+          seed:    this._rand(0, 1000),
+          baseY,
+          opacity: cfg.opacity,
+        };
+
+        this._layers[layerIdx].push(sprite);
+        this._scene.add(sprite);
+        return sprite;
+      }
+
+      _fillViewport() {
+        const stageW = this._stage.clientWidth;
+        for (let l = 0; l < LAYER_COUNT; l++) {
+          const sprites = this._layers[l];
+          let rightEdge = sprites.length
+            ? Math.max(...sprites.map(s => s.position.x + s.userData.w / 2))
+            : -stageW * 1.2;
+          while (rightEdge < stageW) {
+            this._addSprite(l, rightEdge);
+            rightEdge = Math.max(...this._layers[l].map(s => s.position.x + s.userData.w / 2));
+          }
+        }
+      }
+
+      _pruneOffscreen() {
+        const stageW = this._stage.clientWidth;
+        const buffer = stageW * 0.5;
+        const maxPer = PER_LAYER + 4;
+
+        for (let l = 0; l < LAYER_COUNT; l++) {
+          const sprites = this._layers[l];
+          if (sprites.length <= maxPer) continue;
+
+          for (let i = sprites.length - 1; i >= 0 && sprites.length > maxPer; i--) {
+            const s  = sprites[i];
+            const ud = s.userData;
+            const tooFarRight = this._direction > 0 && s.position.x - ud.w / 2 > stageW + buffer;
+            const tooFarLeft  = this._direction < 0 && s.position.x + ud.w / 2 < -buffer;
+            if (tooFarRight || tooFarLeft) {
+              this._scene.remove(s);
+              s.material.dispose();
+              sprites.splice(i, 1);
+            }
+          }
+        }
+      }
+
+      /* ── Animation loop ─────────────────────────── */
+
+      _tick() {
+        requestAnimationFrame(() => this._tick());
+
+        const now = performance.now();
+        const dt  = Math.min(40, now - this._lastTime) / 1000;
+        this._lastTime = now;
+
+        /* Decay velocity (inertia feel) */
+        this._velocity *= 0.93;
+        if (Math.abs(this._velocity) > 0.001) {
+          this._direction = Math.sign(this._velocity);
+        }
+
+        /* Occasional pruning pass */
+        if (Math.random() < 0.01) this._pruneOffscreen();
+
+        const stageW = this._stage.clientWidth;
+        const activeSpeed = Math.abs(this._velocity) > 0.001
+          ? this._velocity * 5
+          : this._direction;
+
+        for (const sprites of this._layers) {
+          for (const s of sprites) {
+            const ud = s.userData;
+
+            s.position.x += ud.speed * activeSpeed * dt;
+
+            /* Wrap sprite to the opposite edge when it leaves the viewport */
+            if (this._direction > 0 && s.position.x - ud.w / 2 > stageW) {
+              s.position.x = -ud.w / 2 - this._rand(0, ud.w);
+            } else if (this._direction < 0 && s.position.x + ud.w / 2 < 0) {
+              s.position.x = stageW + ud.w / 2 + this._rand(0, ud.w);
+            }
+
+            /* Gentle breathing pulse */
+            const pulse = 1 + Math.sin(now * 0.001 + ud.seed) * 0.013;
+            s.scale.set(ud.w * pulse, ud.h * pulse, 1);
+            s.position.y = ud.baseY + Math.sin(now * 0.001 + ud.seed) * 4;
+            s.material.opacity = ud.opacity;
+          }
+        }
+
+        this._renderer.render(this._scene, this._camera);
+      }
+
+      /* ── Window resize ──────────────────────────── */
+
+      _onResize() {
+        const { clientWidth: w, clientHeight: h } = this._stage;
+        this._renderer.setSize(w, h);
+        this._camera.right = w;
+        this._camera.top   = h;
+        this._camera.updateProjectionMatrix();
+
+        /* Clear and rebuild sprite layout */
+        for (const sprites of this._layers) {
+          for (const s of sprites) {
+            this._scene.remove(s);
+            s.material.dispose();
+          }
+        }
+        this._layers = this._emptyLayers();
+        if (this._textures.length === TOTAL_NEEDED) this._fillViewport();
+      }
+
+      /* ── Input events ───────────────────────────── */
+
+      _clientX(e) {
+        return e.touches ? e.touches[0].clientX : e.clientX;
+      }
+
+      _bindEvents() {
+        window.addEventListener('resize', () => this._onResize());
+
+        /* Mouse drag */
+        this._stage.addEventListener('mousedown', e => {
+          this._drag.active = true;
+          this._drag.lastX  = this._clientX(e);
+          this._stage.classList.add('grabbing');
+        });
+        this._stage.addEventListener('mousemove', e => {
+          if (!this._drag.active) return;
+          const x  = this._clientX(e);
+          const dx = x - this._drag.lastX;
+          this._drag.lastX  = x;
+          this._velocity = dx * 0.02;
+        });
+        window.addEventListener('mouseup', () => {
+          this._drag.active = false;
+          this._stage.classList.remove('grabbing');
+        });
+
+        /* Touch drag */
+        this._stage.addEventListener('touchstart', e => {
+          this._drag.active = true;
+          this._drag.lastX  = this._clientX(e);
+        }, { passive: true });
+        this._stage.addEventListener('touchmove', e => {
+          if (!this._drag.active) return;
+          const x  = this._clientX(e);
+          const dx = x - this._drag.lastX;
+          this._drag.lastX  = x;
+          this._velocity = dx * 0.02;
+        }, { passive: true });
+        window.addEventListener('touchend', () => {
+          this._drag.active = false;
+        });
+
+        /* Scroll wheel — accelerate in wheel direction */
+        this._stage.addEventListener('wheel', e => {
+          e.preventDefault();
+          const sign  = Math.sign(e.deltaY);
+          const maxV  = 5;
+          this._direction = sign;
+          this._velocity  = sign * Math.min(maxV, Math.abs(this._velocity) + 0.8);
+          this._pruneOffscreen();
+        }, { passive: false });
+      }
+    }
+
+    /* ── Boot ───────────────────────────────────── */
+    window.addEventListener('load', () => new ParallaxGallery());
+  </script>
+</body>
+</html>
