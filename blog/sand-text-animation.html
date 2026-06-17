@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sand Text Animation</title>
+<style>
+  html,
+  body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #111;
+    font-family: system-ui, sans-serif;
+  }
+
+  #app {
+    width: 100vw;
+    height: 100vh;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at top, #20242b, #0f1115 72%);
+  }
+</style>
+</head>
+<body>
+  <div id="app">
+    <canvas id="sandCanvas"></canvas>
+  </div>
+
+  <script>
+  (function () {
+    "use strict";
+
+    // ---------------------------------------------------------------
+    // Generic, stateless helpers
+    // ---------------------------------------------------------------
+
+    function randomBetween(min, max) {
+      return min + Math.random() * (max - min);
+    }
+
+    function randomIntBetween(min, max) {
+      return Math.floor(randomBetween(min, max + 1));
+    }
+
+    function clamp01(value) {
+      return Math.max(0, Math.min(1, value));
+    }
+
+    function easeInOutCubic(t) {
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+
+    function shuffleInPlace(list) {
+      for (let i = list.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const temp = list[i];
+        list[i] = list[j];
+        list[j] = temp;
+      }
+      return list;
+    }
+
+    // ---------------------------------------------------------------
+    // Tunables
+    // ---------------------------------------------------------------
+
+    const CONFIG = {
+      word: "ADUOK",
+      grainSize: 3,
+      grainColor: "rgb(236, 204, 116)",
+
+      releaseSamplesPerFrame: 1500,
+      releaseChance: 0.022,
+      edgeReleaseMultiplier: 3.3,
+
+      gravity: 850,
+      airDrag: 0.992,
+
+      pileRelaxStepsPerFrame: 5,
+      pileHoldSeconds: 0.8,
+
+      reformDurationSeconds: 2,
+      reformStaggerSeconds: 0.65,
+      formedHoldSeconds: 3
+    };
+
+    // Life cycle: word sits formed -> grains erode away -> they fall ->
+    // they pile up -> pile briefly settles -> pile flies back into the
+    // word shape -> word holds -> cycle repeats.
+    const PHASE = {
+      RELEASING: "releasing",
+      FALLING: "falling",
+      PILED: "piled",
+      REFORMING: "reforming",
+      FORMED: "formed"
+    };
+
+    // ---------------------------------------------------------------
+    // Lightweight grain factories (plain objects, not classes, since
+    // thousands of these get created/destroyed every cycle)
+    // ---------------------------------------------------------------
+
+    function createFallingGrain(x, y) {
+      return {
+        x,
+        y,
+        vx: randomBetween(-22, 22),
+        vy: randomBetween(40, 150),
+        drift: randomBetween(-55, 55),
+        driftTarget: randomBetween(-85, 85),
+        driftTimer: randomBetween(0.18, 0.9)
+      };
+    }
+
+    function createReformingGrain(sx, sy, tx, ty) {
+      return {
+        sx,
+        sy,
+        tx,
+        ty,
+        x: sx,
+        y: sy,
+        delay: randomBetween(0, CONFIG.reformStaggerSeconds),
+        duration: randomBetween(
+          CONFIG.reformDurationSeconds * 0.75,
+          CONFIG.reformDurationSeconds * 1.15
+        ),
+        wave: randomBetween(-18, 18),
+        wobblePhase: randomBetween(0, Math.PI * 2)
+      };
+    }
+
+    // ---------------------------------------------------------------
+    // Main scene
+    // ---------------------------------------------------------------
+
+    class SandTextScene {
+      #canvas;
+      #ctx;
+      #pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+
+      #width = 0;
+      #height = 0;
+      #columns = 0;
+      #rows = 0;
+
+      // Grid indices that make up the static word shape.
+      #wordCells = [];
+      // Shuffled copy of wordCells still waiting to erode away.
+      #releaseQueue = [];
+
+      // 1 = grain currently resting in its word position.
+      #wordMask = new Uint8Array(0);
+      // 1 = grain currently resting in the settled pile.
+      #pileMask = new Uint8Array(0);
+
+      #fallingGrains = [];
+      #reformingGrains = [];
+
+      #phase = PHASE.RELEASING;
+      #phaseElapsed = 0;
+      #lastFrameTime = 0;
+
+      constructor(canvas) {
+        this.#canvas = canvas;
+        this.#ctx = canvas.getContext("2d");
+
+        window.addEventListener("resize", () => this.#handleResize());
+        this.#handleResize();
+
+        this.#lastFrameTime = performance.now();
+        requestAnimationFrame((time) => this.#loop(time));
+      }
+
+      // ----- layout -----
+
+      #handleResize() {
+        this.#width = window.innerWidth;
+        this.#height = window.innerHeight;
+
+        this.#canvas.width = this.#width * this.#pixelRatio;
+        this.#canvas.height = this.#height * this.#pixelRatio;
+        this.#canvas.style.width = this.#width + "px";
+        this.#canvas.style.height = this.#height + "px";
+
+        this.#ctx.setTransform(this.#pixelRatio, 0, 0, this.#pixelRatio, 0, 0);
+
+        this.#columns = Math.ceil(this.#width / CONFIG.grainSize);
+        this.#rows = Math.ceil(this.#height / CONFIG.grainSize);
+
+        this.#wordMask = new Uint8Array(this.#columns * this.#rows);
+        this.#pileMask = new Uint8Array(this.#columns * this.#rows);
+
+        this.#buildWordCells();
+        this.#beginReleasePhase();
+      }
+
+      #cellIndex(col, row) {
+        return row * this.#columns + col;
+      }
+
+      #columnOf(cellIndex) {
+        return cellIndex % this.#columns;
+      }
+
+      #rowOf(cellIndex) {
+        return Math.floor(cellIndex / this.#columns);
+      }
+
+      #isWithinGrid(col, row) {
+        return col >= 0 && col < this.#columns && row >= 0 && row < this.#rows;
+      }
+
+      #buildWordCells() {
+        const maskCanvas = document.createElement("canvas");
+        const maskCtx = maskCanvas.getContext("2d");
+
+        maskCanvas.width = this.#width;
+        maskCanvas.height = this.#height;
+
+        const fontSize = Math.min(this.#width * 0.22, this.#height * 0.28, 190);
+
+        maskCtx.fillStyle = "#fff";
+        maskCtx.textAlign = "center";
+        maskCtx.textBaseline = "middle";
+        maskCtx.font = `900 ${fontSize}px system-ui, sans-serif`;
+        maskCtx.fillText(CONFIG.word, this.#width / 2, this.#height * 0.34);
+
+        const pixels = maskCtx.getImageData(0, 0, this.#width, this.#height).data;
+
+        this.#wordCells = [];
+
+        for (let row = 0; row < this.#rows; row++) {
+          for (let col = 0; col < this.#columns; col++) {
+            const x = Math.floor(col * CONFIG.grainSize + CONFIG.grainSize / 2);
+            const y = Math.floor(row * CONFIG.grainSize + CONFIG.grainSize / 2);
+            const alpha = pixels[(y * this.#width + x) * 4 + 3];
+
+            if (alpha > 35) {
+              this.#wordCells.push(this.#cellIndex(col, row));
+            }
+          }
+        }
+      }
+
+      #beginReleasePhase() {
+        this.#wordMask.fill(0);
+        this.#pileMask.fill(0);
+
+        for (const cellIndex of this.#wordCells) {
+          this.#wordMask[cellIndex] = 1;
+        }
+
+        this.#releaseQueue = shuffleInPlace(this.#wordCells.slice());
+        this.#fallingGrains = [];
+        this.#reformingGrains = [];
+
+        this.#phase = PHASE.RELEASING;
+        this.#phaseElapsed = 0;
+      }
+
+      // ----- word -> falling grains -----
+
+      #updateReleasePhase() {
+        if (this.#releaseQueue.length === 0) {
+          this.#phase = PHASE.FALLING;
+          this.#phaseElapsed = 0;
+          return;
+        }
+
+        for (let i = 0; i < CONFIG.releaseSamplesPerFrame; i++) {
+          if (this.#releaseQueue.length === 0) break;
+
+          const queueIndex = randomIntBetween(0, this.#releaseQueue.length - 1);
+          const cellIndex = this.#releaseQueue[queueIndex];
+
+          if (this.#wordMask[cellIndex] === 0) {
+            this.#releaseQueue.splice(queueIndex, 1);
+            continue;
+          }
+
+          const col = this.#columnOf(cellIndex);
+          const row = this.#rowOf(cellIndex);
+
+          const isAtBottomEdge =
+            row >= this.#rows - 1 ||
+            this.#wordMask[this.#cellIndex(col, row + 1)] === 0;
+
+          const isAtSideEdge =
+            col <= 0 ||
+            col >= this.#columns - 1 ||
+            this.#wordMask[this.#cellIndex(col - 1, row)] === 0 ||
+            this.#wordMask[this.#cellIndex(col + 1, row)] === 0;
+
+          const multiplier =
+            isAtBottomEdge || isAtSideEdge ? CONFIG.edgeReleaseMultiplier : 1;
+
+          if (Math.random() < CONFIG.releaseChance * multiplier) {
+            this.#releaseGrain(cellIndex);
+            this.#releaseQueue.splice(queueIndex, 1);
+          }
+        }
+      }
+
+      #releaseGrain(cellIndex) {
+        const col = this.#columnOf(cellIndex);
+        const row = this.#rowOf(cellIndex);
+
+        this.#wordMask[cellIndex] = 0;
+
+        this.#fallingGrains.push(
+          createFallingGrain(col * CONFIG.grainSize, row * CONFIG.grainSize)
+        );
+      }
+
+      // ----- falling grains -> pile -----
+
+      #isPileSolid(col, row) {
+        if (row >= this.#rows) return true;
+        if (col < 0 || col >= this.#columns) return true;
+        return this.#pileMask[this.#cellIndex(col, row)] === 1;
+      }
+
+      #markPileSolid(col, row) {
+        if (this.#isWithinGrid(col, row)) {
+          this.#pileMask[this.#cellIndex(col, row)] = 1;
+        }
+      }
+
+      #settleGrainIntoPile(grain) {
+        let col = Math.floor(grain.x / CONFIG.grainSize);
+        let row = Math.floor(grain.y / CONFIG.grainSize);
+
+        col = Math.max(0, Math.min(this.#columns - 1, col));
+        row = Math.max(0, Math.min(this.#rows - 1, row));
+
+        if (!this.#isPileSolid(col, row)) {
+          this.#markPileSolid(col, row);
+          return;
+        }
+
+        if (!this.#isPileSolid(col - 1, row)) {
+          this.#markPileSolid(col - 1, row);
+          return;
+        }
+
+        if (!this.#isPileSolid(col + 1, row)) {
+          this.#markPileSolid(col + 1, row);
+          return;
+        }
+
+        for (let y = row - 1; y >= 0; y--) {
+          if (!this.#isPileSolid(col, y)) {
+            this.#markPileSolid(col, y);
+            return;
+          }
+        }
+      }
+
+      #updateFallingGrains(dt) {
+        for (let i = this.#fallingGrains.length - 1; i >= 0; i--) {
+          const grain = this.#fallingGrains[i];
+
+          grain.driftTimer -= dt;
+
+          if (grain.driftTimer <= 0) {
+            grain.driftTarget = randomBetween(-85, 85);
+            grain.driftTimer = randomBetween(0.25, 1.2);
+          }
+
+          grain.drift += (grain.driftTarget - grain.drift) * dt * 2;
+
+          grain.vx += grain.drift * dt;
+          grain.vy += CONFIG.gravity * dt;
+
+          grain.vx *= CONFIG.airDrag;
+          grain.vy *= CONFIG.airDrag;
+
+          grain.x += grain.vx * dt;
+          grain.y += grain.vy * dt;
+
+          if (grain.x < -60) grain.x = 0;
+          if (grain.x > this.#width + 60) grain.x = this.#width - CONFIG.grainSize;
+
+          const col = Math.floor(grain.x / CONFIG.grainSize);
+          const nextRow = Math.floor((grain.y + CONFIG.grainSize) / CONFIG.grainSize);
+
+          if (nextRow >= this.#rows || this.#isPileSolid(col, nextRow)) {
+            this.#settleGrainIntoPile(grain);
+            this.#fallingGrains.splice(i, 1);
+          }
+        }
+
+        if (this.#phase === PHASE.FALLING && this.#fallingGrains.length === 0) {
+          this.#phase = PHASE.PILED;
+          this.#phaseElapsed = 0;
+        }
+      }
+
+      // ----- pile relaxation (simple sand-slide erosion) -----
+
+      #relaxPile() {
+        const leftToRight = Math.random() > 0.5;
+
+        for (let row = this.#rows - 2; row >= 0; row--) {
+          if (leftToRight) {
+            for (let col = 1; col < this.#columns - 1; col++) {
+              this.#relaxPileCell(col, row);
+            }
+          } else {
+            for (let col = this.#columns - 2; col >= 1; col--) {
+              this.#relaxPileCell(col, row);
+            }
+          }
+        }
+      }
+
+      #relaxPileCell(col, row) {
+        const current = this.#cellIndex(col, row);
+
+        if (this.#pileMask[current] !== 1) return;
+
+        if (!this.#isPileSolid(col, row + 1)) {
+          this.#pileMask[this.#cellIndex(col, row + 1)] = 1;
+          this.#pileMask[current] = 0;
+          return;
+        }
+
+        const preferLeft = Math.random() > 0.5;
+        const firstCol = preferLeft ? col - 1 : col + 1;
+        const secondCol = preferLeft ? col + 1 : col - 1;
+
+        if (!this.#isPileSolid(firstCol, row + 1)) {
+          this.#pileMask[this.#cellIndex(firstCol, row + 1)] = 1;
+          this.#pileMask[current] = 0;
+          return;
+        }
+
+        if (!this.#isPileSolid(secondCol, row + 1)) {
+          this.#pileMask[this.#cellIndex(secondCol, row + 1)] = 1;
+          this.#pileMask[current] = 0;
+        }
+      }
+
+      // ----- pile -> word reform -----
+
+      #collectPileCells() {
+        const cells = [];
+
+        for (let i = 0; i < this.#pileMask.length; i++) {
+          if (this.#pileMask[i] === 1) cells.push(i);
+        }
+
+        return cells;
+      }
+
+      #beginReform() {
+        const sourceCells = this.#collectPileCells();
+        const targetCells = this.#wordCells.slice();
+
+        this.#pileMask.fill(0);
+
+        sourceCells.sort((a, b) => this.#rowOf(b) - this.#rowOf(a));
+        targetCells.sort((a, b) => this.#rowOf(b) - this.#rowOf(a));
+
+        const pairCount = Math.min(sourceCells.length, targetCells.length);
+
+        this.#reformingGrains = [];
+
+        for (let i = 0; i < pairCount; i++) {
+          const source = sourceCells[i];
+          const target = targetCells[i];
+
+          this.#reformingGrains.push(
+            createReformingGrain(
+              this.#columnOf(source) * CONFIG.grainSize,
+              this.#rowOf(source) * CONFIG.grainSize,
+              this.#columnOf(target) * CONFIG.grainSize,
+              this.#rowOf(target) * CONFIG.grainSize
+            )
+          );
+        }
+
+        this.#phase = PHASE.REFORMING;
+        this.#phaseElapsed = 0;
+      }
+
+      #updateReform() {
+        let allArrived = true;
+
+        for (const grain of this.#reformingGrains) {
+          const localTime = this.#phaseElapsed - grain.delay;
+
+          if (localTime <= 0) {
+            grain.x = grain.sx;
+            grain.y = grain.sy;
+            allArrived = false;
+            continue;
+          }
+
+          const t = clamp01(localTime / grain.duration);
+          const eased = easeInOutCubic(t);
+          const arc = Math.sin(eased * Math.PI);
+          const wobble =
+            Math.sin(eased * Math.PI * 2 + grain.wobblePhase) * grain.wave * arc;
+
+          grain.x = grain.sx + (grain.tx - grain.sx) * eased + wobble;
+          grain.y = grain.sy + (grain.ty - grain.sy) * eased - arc * this.#height * 0.08;
+
+          if (t < 1) allArrived = false;
+        }
+
+        if (allArrived) {
+          for (const cellIndex of this.#wordCells) {
+            this.#wordMask[cellIndex] = 1;
+          }
+
+          this.#reformingGrains = [];
+          this.#phase = PHASE.FORMED;
+          this.#phaseElapsed = 0;
+        }
+      }
+
+      // ----- phase machine -----
+
+      #updatePhase(dt) {
+        this.#phaseElapsed += dt;
+
+        switch (this.#phase) {
+          case PHASE.RELEASING:
+            this.#updateReleasePhase();
+            break;
+
+          case PHASE.PILED:
+            if (this.#phaseElapsed >= CONFIG.pileHoldSeconds) {
+              this.#beginReform();
+            }
+            break;
+
+          case PHASE.REFORMING:
+            this.#updateReform();
+            break;
+
+          case PHASE.FORMED:
+            if (this.#phaseElapsed >= CONFIG.formedHoldSeconds) {
+              this.#beginReleasePhase();
+            }
+            break;
+
+          default:
+            break;
+        }
+      }
+
+      // ----- rendering -----
+
+      #drawCellsFromMask(mask) {
+        this.#ctx.fillStyle = CONFIG.grainColor;
+
+        for (let row = 0; row < this.#rows; row++) {
+          for (let col = 0; col < this.#columns; col++) {
+            if (mask[this.#cellIndex(col, row)] !== 1) continue;
+
+            this.#ctx.fillRect(
+              col * CONFIG.grainSize,
+              row * CONFIG.grainSize,
+              CONFIG.grainSize,
+              CONFIG.grainSize
+            );
+          }
+        }
+      }
+
+      #drawGrainList(grains) {
+        this.#ctx.fillStyle = CONFIG.grainColor;
+
+        for (const grain of grains) {
+          this.#ctx.fillRect(grain.x, grain.y, CONFIG.grainSize, CONFIG.grainSize);
+        }
+      }
+
+      #render() {
+        this.#ctx.clearRect(0, 0, this.#width, this.#height);
+
+        this.#drawCellsFromMask(this.#wordMask);
+        this.#drawGrainList(this.#fallingGrains);
+        this.#drawCellsFromMask(this.#pileMask);
+        this.#drawGrainList(this.#reformingGrains);
+      }
+
+      // ----- main loop -----
+
+      #loop(now) {
+        const dt = Math.min((now - this.#lastFrameTime) / 1000, 0.033);
+        this.#lastFrameTime = now;
+
+        this.#updatePhase(dt);
+        this.#updateFallingGrains(dt);
+
+        const shouldRelaxPile =
+          this.#phase !== PHASE.REFORMING && this.#phase !== PHASE.FORMED;
+
+        if (shouldRelaxPile) {
+          for (let i = 0; i < CONFIG.pileRelaxStepsPerFrame; i++) {
+            this.#relaxPile();
+          }
+        }
+
+        this.#render();
+
+        requestAnimationFrame((time) => this.#loop(time));
+      }
+    }
+
+    new SandTextScene(document.getElementById("sandCanvas"));
+  })();
+  </script>
+</body>
+</html>
