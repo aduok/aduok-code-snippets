@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pizza Carousel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --parchment: #f4eee1;
+    --espresso:  #2b1d14;
+    --tomato:    #c1652f;
+    --basil:     #4c6e42;
+    --gold:      #c99a3e;
+
+    --font-display: "Fraunces", Georgia, serif;
+    --font-body: "Inter", -apple-system, sans-serif;
+    --font-mono: "IBM Plex Mono", monospace;
+
+    --ease: cubic-bezier(0.22, 0.74, 0.46, 0.97);
+    --speed: 700ms;
+  }
+
+  *{ box-sizing: border-box; }
+  html{ font-size: 62.5%; }
+
+  body{
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--parchment);
+    color: var(--espresso);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    :root{ --speed: 1ms; }
+  }
+
+  .pz-bg{
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    opacity: 0;
+    transition: opacity var(--speed) var(--ease);
+    pointer-events: none;
+  }
+  .pz-bg--0{ background: radial-gradient(circle at 50% 30%, #f0d3ae 0%, var(--parchment) 70%); }
+  .pz-bg--1{ background: radial-gradient(circle at 50% 30%, #e7bcae 0%, var(--parchment) 70%); }
+  .pz-bg--2{ background: radial-gradient(circle at 50% 30%, #eee2bd 0%, var(--parchment) 70%); }
+  .pz-bg--3{ background: radial-gradient(circle at 50% 30%, #e3a89a 0%, var(--parchment) 70%); }
+
+  .pz-page{
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* wrap clips at the page edge; container is narrower and left overflow-visible
+     so neighboring slides peek in from both sides */
+  .pz-carousel-wrap{
+    width: 100%;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+  }
+
+  .pz-carousel{
+    width: min(60%, 380px);
+    overflow: visible;
+    touch-action: pan-y;
+    cursor: grab;
+  }
+  .pz-carousel.is-dragging{ cursor: grabbing; }
+
+  .pz-track{
+    display: flex;
+    will-change: transform;
+  }
+
+  .pz-slide{
+    flex: 0 0 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 0 2rem;
+  }
+
+  .pz-card{
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* ---------------------------------------------------------
+     Pizza (CSS-drawn, no images)
+  --------------------------------------------------------- */
+  .pz-pizza{
+    position: relative;
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 6px #fff6e6, 0 10px 24px rgba(43,29,20,0.35);
+    background: #e8d9bd; /* visible while the photo loads */
+    overflow: hidden;
+  }
+  .pz-pizza__img{
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .pz-shadow{
+    margin-top: -10px;
+    width: 160px;
+    height: 22px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse, rgba(43,29,20,0.35), transparent 70%);
+  }
+
+  .text-mask{
+    overflow: hidden;
+  }
+  .text-mask span{
+    display: inline-flex;
+  }
+
+  .pz-card__info{
+    margin-top: 1.4rem;
+    text-align: center;
+  }
+  .pz-card__origin{
+    font-family: var(--font-mono);
+    font-size: 1.05rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.5;
+  }
+  .pz-card__name{
+    margin-top: 2px;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 2.1rem;
+  }
+  .pz-card__notes{
+    margin-top: 6px;
+    font-size: 1.15rem;
+    line-height: 1.4;
+    opacity: 0.75;
+    max-width: 220px;
+    margin-inline: auto;
+  }
+  .pz-card__price{
+    margin-top: 8px;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.5rem;
+    color: var(--tomato);
+  }
+
+  .pz-controls{
+    width: min(90%, 460px);
+    margin-top: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .pz-nav{
+    appearance: none;
+    background: none;
+    border: none;
+    padding: 8px 0;
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 1.2rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--espresso);
+    cursor: pointer;
+    position: relative;
+    white-space: nowrap;
+  }
+  .pz-nav::after{
+    content:"";
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 1px;
+    background: currentColor;
+    transform: scaleX(0.3);
+    transform-origin: left;
+    transition: transform 300ms var(--ease);
+  }
+  .pz-nav.next::after{ transform-origin: right; }
+  .pz-nav:hover:not(:disabled)::after{ transform: scaleX(1); }
+  .pz-nav:disabled{ opacity: 0.3; cursor: default; }
+  .pz-nav:focus-visible{
+    outline: 2px solid var(--tomato);
+    outline-offset: 4px;
+  }
+
+  /* heat-level rail — encodes each pizza's real spice level */
+  .pz-heat{
+    flex: 1;
+    position: relative;
+    height: 30px;
+    display: flex;
+    align-items: center;
+  }
+  .pz-heat__bar{
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, #7fae5e, #d9b23e 45%, #d97b2f 75%, #b5341c);
+  }
+  .pz-heat__marker{
+    position: absolute;
+    top: 50%;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--parchment);
+    box-shadow: 0 0 0 2px var(--espresso), 0 2px 6px rgba(0,0,0,0.3);
+    transform: translate(-50%, -50%);
+  }
+  .pz-heat__label{
+    position: absolute;
+    top: -20px;
+    left: 0;
+    transform: translateX(-50%);
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 480px){
+    .pz-carousel{ width: 72%; }
+    .pz-pizza{ width: 160px; height: 160px; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="pz-bg pz-bg--0" data-bg="0"></div>
+  <div class="pz-bg pz-bg--1" data-bg="1"></div>
+  <div class="pz-bg pz-bg--2" data-bg="2"></div>
+  <div class="pz-bg pz-bg--3" data-bg="3"></div>
+
+  <div class="pz-page">
+    <div class="pz-carousel-wrap">
+      <div class="pz-carousel" id="pzCarousel" role="region" aria-roledescription="carousel" aria-label="Pizza menu" tabindex="0">
+        <div class="pz-track" id="pzTrack"></div>
+      </div>
+    </div>
+
+    <div class="pz-controls">
+      <button class="pz-nav prev" id="pzPrev" aria-label="Previous pizza">Prev</button>
+      <div class="pz-heat">
+        <div class="pz-heat__bar"></div>
+        <div class="pz-heat__label" id="pzLabel">Mild</div>
+        <div class="pz-heat__marker" id="pzMarker"></div>
+      </div>
+      <button class="pz-nav next" id="pzNext" aria-label="Next pizza">Next</button>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const PIZZAS = [
+    {
+      name: "Margherita", tag: "Classico", heat: "Mild", heatPos: 0.08,
+      notes: "San Marzano tomato, fior di latte, basil", price: "$12.00", style: 0,
+      fallbackImg: "https://foodish-api.com/images/pizza/pizza1.jpg"
+    },
+    {
+      name: "Pepperoni", tag: "American Classic", heat: "Medium", heatPos: 0.42,
+      notes: "Mozzarella, cup-and-char pepperoni, oregano", price: "$14.50", style: 1,
+      fallbackImg: "https://foodish-api.com/images/pizza/pizza10.jpg"
+    },
+    {
+      name: "Quattro Formaggi", tag: "Four Cheese", heat: "Mild-Medium", heatPos: 0.55,
+      notes: "Gorgonzola, fontina, parmesan, mozzarella", price: "$15.00", style: 2,
+      fallbackImg: "https://foodish-api.com/images/pizza/pizza25.jpg"
+    },
+    {
+      name: "Diavola", tag: "Spicy Salami", heat: "Hot", heatPos: 0.92,
+      notes: "'Nduja, chili, mozzarella", price: "$15.50", style: 3,
+      fallbackImg: "https://foodish-api.com/images/pizza/pizza50.jpg"
+    }
+  ];
+
+  // Pulls real, freely-usable pizza photos from Foodish (foodish-api.com).
+  // Falls back to a fixed image per card if the request fails, so the layout
+  // never breaks even without network access to that domain.
+  async function fetchPizzaImages(count) {
+    try {
+      const res = await fetch("https://foodish-api.com/api/images/pizza/");
+      const data = await res.json();
+      const urls = Array.isArray(data) ? data : data.images || [];
+      if (urls.length >= count) {
+        // shuffle then take the first `count` for variety
+        return urls.sort(() => Math.random() - 0.5).slice(0, count);
+      }
+    } catch (err) {
+      console.warn("Foodish fetch failed, using fallback images", err);
+    }
+    return PIZZAS.map((p) => p.fallbackImg);
+  }
+
+  const track = document.getElementById("pzTrack");
+  const carousel = document.getElementById("pzCarousel");
+  const prevBtn = document.getElementById("pzPrev");
+  const nextBtn = document.getElementById("pzNext");
+  const marker = document.getElementById("pzMarker");
+  const label = document.getElementById("pzLabel");
+  const bgLayers = document.querySelectorAll("[data-bg]");
+
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  let activeIndex = 0;
+  let trackPosition = 0;     // continuous position, e.g. 1.35 while dragging
+  let isDragging = false;
+  let startX = 0;
+  let startTrackPosition = 0;
+  let lastMoveTime = 0;
+  let lastMoveX = 0;
+  let velocity = 0;
+
+  async function buildSlides() {
+    const images = await fetchPizzaImages(PIZZAS.length);
+
+    PIZZAS.forEach((p, i) => {
+      const slide = document.createElement("div");
+      slide.className = "pz-slide";
+
+      slide.innerHTML = `
+        <div class="pz-card">
+          <div class="pz-pizza">
+            <img class="pz-pizza__img" src="${images[i] || p.fallbackImg}" alt="${p.name} pizza" loading="lazy" />
+          </div>
+          <div class="pz-shadow"></div>
+          <div class="pz-card__info">
+            <div class="pz-card__origin">${p.tag}</div>
+            <div class="pz-card__name text-mask"><span>${p.name}</span></div>
+            <div class="pz-card__notes text-mask"><span>${p.notes}</span></div>
+            <div class="pz-card__price text-mask"><span>${p.price}</span></div>
+          </div>
+        </div>
+      `;
+
+      track.appendChild(slide);
+    });
+  }
+
+  function setTransition(speed) {
+    track.style.transition = isDragging ? "none" : `transform ${speed}ms var(--ease)`;
+    track.querySelectorAll(".pz-card").forEach((card) => {
+      card.style.transition = isDragging ? "none" : `transform ${speed}ms var(--ease)`;
+    });
+    track.querySelectorAll(".text-mask span").forEach((span) => {
+      span.style.transition = isDragging ? "none" : `transform ${speed}ms var(--ease)`;
+    });
+  }
+
+  function render() {
+    const containerWidth = carousel.clientWidth;
+    track.style.transform = `translate3d(${-trackPosition * containerWidth}px, 0, 0)`;
+
+    const slides = track.querySelectorAll(".pz-slide");
+    slides.forEach((slide, i) => {
+      const progress = Math.max(-1, Math.min(1, i - trackPosition));
+      const abs = Math.abs(progress);
+      const card = slide.querySelector(".pz-card");
+      const scale = 1 - abs * 0.28;
+      const rotate = reduceMotion ? 0 : progress * -14;
+      const opacity = 1 - abs * 0.65;
+
+      card.style.transform = `scale(${scale}) rotate(${rotate}deg)`;
+      card.style.opacity = opacity.toFixed(2);
+
+      if (!reduceMotion) {
+        slide.querySelectorAll(".text-mask span").forEach((span, si) => {
+          span.style.transform = `translate3d(0, ${abs * 40 * (si + 1)}px, 0)`;
+        });
+      }
+    });
+
+    const active = PIZZAS[Math.round(trackPosition) === activeIndex ? activeIndex : activeIndex];
+    marker.style.left = `${PIZZAS[activeIndex].heatPos * 100}%`;
+    label.style.left = `${PIZZAS[activeIndex].heatPos * 100}%`;
+    label.textContent = PIZZAS[activeIndex].heat;
+
+    bgLayers.forEach((layer) => {
+      layer.style.opacity = Number(layer.dataset.bg) === PIZZAS[activeIndex].style ? "0.5" : "0";
+    });
+
+    prevBtn.disabled = activeIndex === 0;
+    nextBtn.disabled = activeIndex === PIZZAS.length - 1;
+    carousel.setAttribute("aria-label", `Pizza menu, showing ${PIZZAS[activeIndex].name}`);
+  }
+
+  function goTo(index, speed = 700) {
+    activeIndex = Math.max(0, Math.min(PIZZAS.length - 1, index));
+    trackPosition = activeIndex;
+    setTransition(speed);
+    requestAnimationFrame(render);
+  }
+
+  prevBtn.addEventListener("click", () => goTo(activeIndex - 1));
+  nextBtn.addEventListener("click", () => goTo(activeIndex + 1));
+
+  carousel.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") goTo(activeIndex - 1);
+    if (e.key === "ArrowRight") goTo(activeIndex + 1);
+  });
+
+  // real-time drag, mirroring the reference's grab-and-follow feel
+  carousel.addEventListener("pointerdown", (e) => {
+    isDragging = true;
+    carousel.classList.add("is-dragging");
+    startX = e.clientX;
+    startTrackPosition = trackPosition;
+    lastMoveTime = performance.now();
+    lastMoveX = e.clientX;
+    velocity = 0;
+    setTransition(0);
+    carousel.setPointerCapture(e.pointerId);
+  });
+
+  carousel.addEventListener("pointermove", (e) => {
+    if (!isDragging) return;
+    const containerWidth = carousel.clientWidth;
+    const deltaX = e.clientX - startX;
+    trackPosition = startTrackPosition - deltaX / containerWidth;
+
+    const now = performance.now();
+    const dt = now - lastMoveTime;
+    if (dt > 0) velocity = (e.clientX - lastMoveX) / dt;
+    lastMoveTime = now;
+    lastMoveX = e.clientX;
+
+    requestAnimationFrame(render);
+  });
+
+  function endDrag() {
+    if (!isDragging) return;
+    isDragging = false;
+    carousel.classList.remove("is-dragging");
+
+    // flick with enough velocity moves an extra slide; otherwise snap to nearest
+    let target = Math.round(trackPosition);
+    if (Math.abs(velocity) > 0.4) {
+      target = velocity < 0 ? Math.ceil(trackPosition) : Math.floor(trackPosition);
+    }
+    const speed = Math.max(200, Math.min(1000, 1000 - Math.abs(velocity) * 800));
+    goTo(target, speed);
+  }
+
+  carousel.addEventListener("pointerup", endDrag);
+  carousel.addEventListener("pointercancel", endDrag);
+  carousel.addEventListener("pointerleave", (e) => {
+    if (isDragging && e.buttons === 0) endDrag();
+  });
+
+  window.addEventListener("resize", () => requestAnimationFrame(render));
+
+  (async () => {
+    await buildSlides();
+    goTo(0, 1);
+  })();
+})();
+</script>
+</body>
+</html>
