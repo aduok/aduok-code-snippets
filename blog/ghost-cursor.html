@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ghost Cursor</title>
+
+<style>
+  :root {
+    --bg-color: #2c3e50;
+
+    /* Control panel theme */
+    --panel-width: 260px;
+    --panel-bg: rgba(5, 0, 15, 0.8);
+    --panel-widget-bg: rgba(255, 255, 255, 0.1);
+    --panel-widget-hover: rgba(255, 255, 255, 0.15);
+    --panel-focus: rgba(255, 255, 255, 0.2);
+    --panel-text: #e6e6e6;
+    --panel-text-dim: #a3a3a3;
+    --panel-font: 12px/1.4 "Menlo", "Consolas", monospace;
+    --panel-radius: 6px;
+    --panel-spacing: 8px;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: var(--bg-color);
+    height: 100%;
+  }
+
+  canvas#ghost-canvas {
+    position: fixed;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    z-index: 10000;
+    pointer-events: none;
+  }
+
+  .page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    text-align: center;
+    font-size: 4vw;
+    font-family: system-ui, sans-serif;
+    text-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
+  }
+
+  /* ---- Custom control panel ---- */
+
+  .control-panel {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    width: var(--panel-width);
+    max-width: 90vw;
+    background: var(--panel-bg);
+    color: var(--panel-text);
+    font: var(--panel-font);
+    border-radius: var(--panel-radius);
+    overflow: hidden;
+    z-index: 10001;
+    backdrop-filter: blur(2px);
+    user-select: none;
+  }
+
+  .control-panel__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-weight: bold;
+    letter-spacing: 0.02em;
+  }
+
+  .control-panel__header:hover {
+    background: var(--panel-widget-hover);
+  }
+
+  .control-panel__caret {
+    transition: transform 0.15s ease;
+    font-size: 10px;
+    opacity: 0.7;
+  }
+
+  .control-panel.is-collapsed .control-panel__caret {
+    transform: rotate(-90deg);
+  }
+
+  .control-panel.is-collapsed .control-panel__body {
+    display: none;
+  }
+
+  .control-panel__body {
+    padding: var(--panel-spacing) 10px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--panel-spacing);
+  }
+
+  .control-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .control-row.is-disabled {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+
+  .control-row__label {
+    color: var(--panel-text-dim);
+    flex: 0 0 auto;
+  }
+
+  .control-row__widget {
+    flex: 1 1 auto;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .control-row__value {
+    color: var(--panel-text-dim);
+    width: 36px;
+    text-align: right;
+    font-size: 11px;
+  }
+
+  .control-panel input[type="range"] {
+    width: 110px;
+    accent-color: #7fb2d8;
+    background: var(--panel-widget-bg);
+  }
+
+  .control-panel input[type="color"] {
+    width: 28px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    border-radius: 3px;
+    background: var(--panel-widget-bg);
+    cursor: pointer;
+  }
+
+  .control-panel input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    accent-color: #7fb2d8;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="ghost-canvas"></canvas>
+<div class="page">Move your cursor around</div>
+
+<!-- ==================== SHADERS ==================== -->
+
+<script type="x-shader/x-vertex" id="vert-shader">
+  precision mediump float;
+  attribute vec2 a_position;
+  varying vec2 v_uv;
+
+  void main() {
+    v_uv = 0.5 * (a_position + 1.0);
+    gl_Position = vec4(a_position, 0.0, 1.0);
+  }
+</script>
+
+<script type="x-shader/x-fragment" id="frag-shader">
+  precision mediump float;
+
+  varying vec2 v_uv;
+
+  uniform float u_time;
+  uniform float u_ratio;
+  uniform float u_size;
+  uniform vec2  u_pointer;
+  uniform vec2  u_target_pointer;
+  uniform float u_smile;
+  uniform vec3  u_main_color;
+  uniform vec3  u_border_color;
+  uniform float u_flat_color;
+  uniform sampler2D u_texture;
+
+  // ---- Simplex noise (Ashima Arts) ----
+  vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+  vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+  vec3 permute(vec3 x) { return mod289(((x * 34.0) + 1.0) * x); }
+
+  float snoise(vec2 v) {
+    const vec4 C = vec4(0.211324865405187, 0.366025403784439,
+                        -0.577350269189626, 0.024390243902439);
+    vec2 i  = floor(v + dot(v, C.yy));
+    vec2 x0 = v - i + dot(i, C.xx);
+
+    vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+    vec4 x12 = x0.xyxy + C.xxzz;
+    x12.xy -= i1;
+
+    i = mod289(i);
+    vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
+
+    vec3 m = max(0.5 - vec3(dot(x0, x0), dot(x12.xy, x12.xy), dot(x12.zw, x12.zw)), 0.0);
+    m = m * m;
+    m = m * m;
+
+    vec3 x = 2.0 * fract(p * C.www) - 1.0;
+    vec3 h = abs(x) - 0.5;
+    vec3 ox = floor(x + 0.5);
+    vec3 a0 = x - ox;
+    m *= 1.79284291400159 - 0.85373472095314 * (a0 * a0 + h * h);
+
+    vec3 g;
+    g.x = a0.x * x0.x + h.x * x0.y;
+    g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+    return 130.0 * dot(m, g);
+  }
+
+  vec2 rotate(vec2 v, float angle) {
+    float s = sin(angle);
+    float c = cos(angle);
+    return vec2(v.x * c - v.y * s, v.x * s + v.y * c);
+  }
+
+  // ---- Facial features ----
+  float eyeShape(vec2 uv) {
+    uv.y -= 0.5;
+    uv.y *= 0.8;
+    uv.x = abs(uv.x);
+    uv.y += u_smile * 0.3 * pow(uv.x, 1.3);
+    uv.x -= (0.6 + 0.2 * u_smile);
+    float d = clamp(length(uv), 0.0, 1.0);
+    return 1.0 - pow(d, 0.08);
+  }
+
+  float mouthShape(vec2 uv) {
+    uv.y += 1.5;
+    uv.x *= (0.5 + 0.5 * abs(1.0 - u_smile));
+    uv.y *= (3.0 - 2.0 * abs(1.0 - u_smile));
+    uv.y -= u_smile * 4.0 * pow(uv.x, 2.0);
+    float d = clamp(length(uv), 0.0, 1.0);
+    return 1.0 - pow(d, 0.07);
+  }
+
+  float faceMask(vec2 uv, float rotation) {
+    uv = rotate(uv, rotation);
+    uv /= (0.27 * u_size);
+    float eyes = 10.0 * eyeShape(uv);
+    float mouth = 20.0 * mouthShape(uv);
+    float mask = 0.0;
+    mask = mix(mask, 1.0, eyes);
+    mask = mix(mask, 1.0, mouth);
+    return mask;
+  }
+
+  void main() {
+    vec2 pointer = u_pointer;
+    pointer.x *= u_ratio;
+
+    vec2 uv = v_uv;
+    uv.x *= u_ratio;
+    uv -= pointer;
+
+    float trailMask = texture2D(u_texture, vec2(v_uv.x, 1.0 - v_uv.y)).r;
+
+    float grain = snoise(uv * vec2(0.7, 0.6) / u_size + vec2(0.0, 0.0015 * u_time));
+    grain += 1.2;
+    grain *= 2.1;
+    grain += smoothstep(-0.8, -0.2, uv.y / u_size);
+
+    float faceRotation = 5.0 * (u_target_pointer.x - u_pointer.x);
+    float shape = trailMask - faceMask(uv, faceRotation);
+    shape *= grain;
+
+    vec3 border = (1.0 - u_border_color);
+    border.g += 0.2 * sin(0.005 * u_time);
+    border *= 0.5;
+
+    vec3 color = u_main_color;
+    color -= (1.0 - u_flat_color) * border * smoothstep(0.0, 0.01, shape);
+    shape = u_flat_color * smoothstep(0.8, 1.0, shape) + (1.0 - u_flat_color) * shape;
+    color *= shape;
+
+    gl_FragColor = vec4(color, shape);
+  }
+</script>
+
+<!-- ==================== APPLICATION ==================== -->
+
+<script type="module">
+
+/**
+ * Compiles a GLSL shader and reports compile errors to the console.
+ */
+function compileShader(gl, source, type) {
+  const shader = gl.createShader(type);
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    console.error("Shader compile error:", gl.getShaderInfoLog(shader));
+    gl.deleteShader(shader);
+    return null;
+  }
+  return shader;
+}
+
+/**
+ * Links a vertex + fragment shader pair into a usable program.
+ */
+function createProgram(gl, vertexSource, fragmentSource) {
+  const vertexShader = compileShader(gl, vertexSource, gl.VERTEX_SHADER);
+  const fragmentShader = compileShader(gl, fragmentSource, gl.FRAGMENT_SHADER);
+
+  const program = gl.createProgram();
+  gl.attachShader(program, vertexShader);
+  gl.attachShader(program, fragmentShader);
+  gl.linkProgram(program);
+
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    console.error("Program link error:", gl.getProgramInfoLog(program));
+    return null;
+  }
+  return program;
+}
+
+/**
+ * Reads every active uniform location on a program into a lookup map.
+ */
+function getUniformLocations(gl, program) {
+  const uniforms = {};
+  const count = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
+  for (let i = 0; i < count; i++) {
+    const { name } = gl.getActiveUniform(program, i);
+    uniforms[name] = gl.getUniformLocation(program, name);
+  }
+  return uniforms;
+}
+
+/** Converts a #rrggbb hex string to a [r, g, b] float triple in the 0-1 range. */
+function hexToRgbFloat(hex) {
+  const int = parseInt(hex.slice(1), 16);
+  return [
+    ((int >> 16) & 255) / 255,
+    ((int >> 8) & 255) / 255,
+    (int & 255) / 255,
+  ];
+}
+
+/** Converts a [r, g, b] float triple (0-1) back to a #rrggbb hex string. */
+function rgbFloatToHex([r, g, b]) {
+  const toByte = (v) => Math.round(v * 255).toString(16).padStart(2, "0");
+  return `#${toByte(r)}${toByte(g)}${toByte(b)}`;
+}
+
+/**
+ * A single glowing dot in the cursor's trailing tail. Dots after the first
+ * follow the one in front of them using simple spring physics.
+ */
+class TrailDot {
+  constructor(x, y, radius, opacity, borderRatio) {
+    this.x = x;
+    this.y = y;
+    this.vx = 0;
+    this.vy = 0;
+    this.radius = radius;
+    this.opacity = opacity;
+    this.borderRatio = borderRatio;
+  }
+
+  followLeader(leader, spring, friction, gravity) {
+    this.vx += (leader.x - this.x) * spring;
+    this.vx *= friction;
+
+    this.vy += (leader.y - this.y) * spring;
+    this.vy *= friction;
+    this.vy += gravity;
+
+    this.x += this.vx;
+    this.y += this.vy;
+  }
+}
+
+/**
+ * Manages the chain of TrailDots and rasterizes them into a canvas texture
+ * that the fragment shader samples as a mask.
+ */
+class PointerTrail {
+  constructor(dotCount, sizeFn) {
+    this.dotCount = dotCount;
+    this.sizeFn = sizeFn;
+    this.dots = [];
+
+    this.canvas = document.createElement("canvas");
+    this.ctx = this.canvas.getContext("2d");
+
+    this.rebuild(0, 0);
+  }
+
+  rebuild(startX, startY) {
+    this.dots = Array.from({ length: this.dotCount }, (_, i) => {
+      const opacity = 0.04 + 0.3 * Math.pow(1 - i / this.dotCount, 4);
+      const borderRatio = 0.6 * Math.pow(1 - i / this.dotCount, 1);
+      return new TrailDot(startX, startY, this.sizeFn(i), opacity, borderRatio);
+    });
+  }
+
+  resize(width, height) {
+    this.canvas.width = width;
+    this.canvas.height = height;
+    this.refreshRadii();
+  }
+
+  refreshRadii() {
+    this.dots.forEach((dot, i) => (dot.radius = this.sizeFn(i)));
+  }
+
+  update(leadX, leadY, spring, friction, gravity) {
+    this.dots.forEach((dot, i) => {
+      if (i === 0) {
+        dot.x = leadX;
+        dot.y = leadY;
+      } else {
+        dot.followLeader(this.dots[i - 1], spring, friction, gravity);
+      }
+    });
+  }
+
+  draw() {
+    const { ctx, canvas } = this;
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (const dot of this.dots) {
+      const gradient = ctx.createRadialGradient(
+        dot.x, dot.y, dot.radius * dot.borderRatio,
+        dot.x, dot.y, dot.radius
+      );
+      gradient.addColorStop(0, `rgba(255, 255, 255, ${dot.opacity})`);
+      gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+
+      ctx.beginPath();
+      ctx.fillStyle = gradient;
+      ctx.arc(dot.x, dot.y, dot.radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
+/**
+ * Tracks target vs. eased pointer position, plus whether the pointer is
+ * actively moving (used to drive the smile/gravity animation).
+ */
+class PointerState {
+  static EASING = 0.1;
+  static IDLE_DELAY_MS = 300;
+
+  constructor(startX, startY) {
+    this.x = startX;
+    this.y = startY;
+    this.targetX = startX;
+    this.targetY = startY;
+    this.isMoving = false;
+    this.controlsPadding = 0;
+    this._idleTimer = null;
+  }
+
+  setTarget(clientX, clientY, size) {
+    this.isMoving = this.controlsPadding >= 0;
+
+    clearTimeout(this._idleTimer);
+    this._idleTimer = setTimeout(() => (this.isMoving = false), PointerState.IDLE_DELAY_MS);
+
+    this.targetX = clientX;
+
+    let y = clientY - 0.6 * size;
+    this.targetY = (y > size ? y : size) - this.controlsPadding;
+  }
+
+  ease() {
+    this.x += (this.targetX - this.x) * PointerState.EASING;
+    this.y += (this.targetY - this.y) * PointerState.EASING;
+  }
+}
+
+/**
+ * Top-level controller: owns the GL context, the trail, the pointer state,
+ * and the animation loop. Call `dispose()` to tear everything down.
+ */
+class GhostCursor {
+  static DEFAULTS = {
+    size: 0.1,
+    dotsNumber: 25,
+    spring: 1.4,
+    friction: 0.3,
+    mainColor: [0.98, 0.96, 0.96],
+    borderColor: [0.2, 0.5, 0.7],
+    isFlatColor: false,
+  };
+
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+
+    this.params = {
+      size: GhostCursor.DEFAULTS.size,
+      spring: GhostCursor.DEFAULTS.spring,
+      friction: GhostCursor.DEFAULTS.friction,
+      gravity: 0,
+      smile: 1,
+      mainColor: [...GhostCursor.DEFAULTS.mainColor],
+      borderColor: [...GhostCursor.DEFAULTS.borderColor],
+      isFlatColor: GhostCursor.DEFAULTS.isFlatColor,
+    };
+
+    const startX = 0.25 * window.innerWidth;
+    const startY = 0.8 * window.innerHeight;
+    this.pointer = new PointerState(startX, startY);
+
+    this.trail = new PointerTrail(
+      GhostCursor.DEFAULTS.dotsNumber,
+      (i) => this._dotRadius(i)
+    );
+    this.trail.rebuild(startX, startY);
+
+    this._initGL();
+    this._bindEvents();
+
+    this._rafId = null;
+    this._resizeCanvas();
+  }
+
+  _dotRadius(i) {
+    const count = GhostCursor.DEFAULTS.dotsNumber;
+    return this.params.size * window.innerHeight * (1 - 0.2 * Math.pow((3 * i) / count - 1, 2));
+  }
+
+  _initGL() {
+    const gl = this.canvas.getContext("webgl") || this.canvas.getContext("experimental-webgl");
+    if (!gl) {
+      alert("WebGL is not supported by your browser.");
+      throw new Error("WebGL unavailable");
+    }
+    this.gl = gl;
+
+    const vertexSource = document.getElementById("vert-shader").textContent;
+    const fragmentSource = document.getElementById("frag-shader").textContent;
+    this.program = createProgram(gl, vertexSource, fragmentSource);
+    this.uniforms = getUniformLocations(gl, this.program);
+
+    gl.useProgram(this.program);
+
+    const quad = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
+
+    const positionLoc = gl.getAttribLocation(this.program, "a_position");
+    gl.enableVertexAttribArray(positionLoc);
+    gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
+
+    this.texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.uniform1i(this.uniforms.u_texture, 0);
+
+    gl.uniform1f(this.uniforms.u_size, this.params.size);
+    this._syncColorUniforms();
+  }
+
+  _syncColorUniforms() {
+    const { gl, uniforms, params } = this;
+    gl.uniform3f(uniforms.u_main_color, ...params.mainColor);
+    gl.uniform3f(uniforms.u_border_color, ...params.borderColor);
+    gl.uniform1f(uniforms.u_flat_color, params.isFlatColor ? 1 : 0);
+  }
+
+  _bindEvents() {
+    this._onResize = () => this._resizeCanvas();
+    this._onMouseMove = (e) => this._updatePointer(e.clientX, e.clientY);
+    this._onTouchMove = (e) => this._updatePointer(e.targetTouches[0].clientX, e.targetTouches[0].clientY);
+    this._onClick = (e) => this._updatePointer(e.clientX, e.clientY);
+
+    window.addEventListener("resize", this._onResize);
+    window.addEventListener("mousemove", this._onMouseMove);
+    window.addEventListener("touchmove", this._onTouchMove);
+    window.addEventListener("click", this._onClick);
+  }
+
+  _updatePointer(clientX, clientY) {
+    const size = this.params.size * window.innerHeight;
+    this.pointer.setTarget(clientX, clientY, size);
+  }
+
+  _resizeCanvas() {
+    const { canvas, gl, devicePixelRatio } = this;
+    canvas.width = window.innerWidth * devicePixelRatio;
+    canvas.height = window.innerHeight * devicePixelRatio;
+
+    this.trail.resize(window.innerWidth, window.innerHeight);
+
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.uniform1f(this.uniforms.u_ratio, canvas.width / canvas.height);
+  }
+
+  _updateFaceAnimation() {
+    const p = this.params;
+    if (this.pointer.isMoving) {
+      p.smile = Math.max(p.smile - 0.05, -0.1);
+      p.gravity = Math.max(p.gravity - 10 * p.size, 0);
+    } else {
+      p.smile = Math.min(p.smile + 0.01, 1);
+      p.gravity = p.gravity > 25 * p.size
+        ? (25 + 5 * (1 + Math.sin(0.002 * performance.now()))) * p.size
+        : p.gravity + p.size;
+    }
+  }
+
+  _renderFrame() {
+    const { gl, uniforms } = this;
+    const now = performance.now();
+
+    this._updateFaceAnimation();
+    this.pointer.ease();
+
+    gl.uniform1f(uniforms.u_time, now);
+    gl.uniform1f(uniforms.u_smile, this.params.smile);
+    gl.uniform2f(uniforms.u_pointer, this.pointer.x / window.innerWidth, 1 - this.pointer.y / window.innerHeight);
+    gl.uniform2f(uniforms.u_target_pointer, this.pointer.targetX / window.innerWidth, 1 - this.pointer.targetY / window.innerHeight);
+
+    this.trail.update(this.pointer.x, this.pointer.y, this.params.spring, this.params.friction, this.params.gravity);
+    this.trail.draw();
+
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.trail.canvas);
+
+    gl.clearColor(0, 0, 0, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+    this._rafId = requestAnimationFrame(() => this._renderFrame());
+  }
+
+  start() {
+    this._renderFrame();
+  }
+
+  setSize(value) {
+    this.params.size = value;
+    this.trail.refreshRadii();
+    this.gl.uniform1f(this.uniforms.u_size, value);
+  }
+
+  setMainColor(rgb) {
+    this.params.mainColor = rgb;
+    this.gl.uniform3f(this.uniforms.u_main_color, ...rgb);
+  }
+
+  setBorderColor(rgb) {
+    this.params.borderColor = rgb;
+    this.gl.uniform3f(this.uniforms.u_border_color, ...rgb);
+  }
+
+  setFlatColor(isFlat) {
+    this.params.isFlatColor = isFlat;
+    this.gl.uniform1f(this.uniforms.u_flat_color, isFlat ? 1 : 0);
+  }
+
+  setControlsPadding(padding) {
+    this.pointer.controlsPadding = padding;
+  }
+
+  dispose() {
+    cancelAnimationFrame(this._rafId);
+    window.removeEventListener("resize", this._onResize);
+    window.removeEventListener("mousemove", this._onMouseMove);
+    window.removeEventListener("touchmove", this._onTouchMove);
+    window.removeEventListener("click", this._onClick);
+  }
+}
+
+/**
+ * Minimal control panel for adjusting the effect's parameters at runtime.
+ * Builds its own DOM/CSS with no external dependency.
+ */
+class ControlPanel {
+  constructor(ghost) {
+    this.ghost = ghost;
+    this.root = this._buildDOM();
+    document.body.appendChild(this.root);
+    this._bindHoverPadding();
+  }
+
+  _buildDOM() {
+    const root = document.createElement("div");
+    root.className = "control-panel is-collapsed";
+
+    const header = document.createElement("div");
+    header.className = "control-panel__header";
+    header.innerHTML = `<span>Controls</span><span class="control-panel__caret">▾</span>`;
+    header.addEventListener("click", () => root.classList.toggle("is-collapsed"));
+
+    const body = document.createElement("div");
+    body.className = "control-panel__body";
+
+    body.appendChild(this._sliderRow(
+      "size", 0.02, 0.3, 0.01, this.ghost.params.size,
+      (v) => this.ghost.setSize(v)
+    ));
+
+    body.appendChild(this._colorRow(
+      "mainColor", this.ghost.params.mainColor,
+      (rgb) => this.ghost.setMainColor(rgb)
+    ));
+
+    const borderRow = this._colorRow(
+      "borderColor", this.ghost.params.borderColor,
+      (rgb) => this.ghost.setBorderColor(rgb)
+    );
+    body.appendChild(borderRow);
+
+    body.appendChild(this._checkboxRow(
+      "isFlatColor", this.ghost.params.isFlatColor,
+      (checked) => {
+        borderRow.classList.toggle("is-disabled", checked);
+        this.ghost.setFlatColor(checked);
+      }
+    ));
+
+    root.append(header, body);
+    return root;
+  }
+
+  _row(label, widget) {
+    const row = document.createElement("div");
+    row.className = "control-row";
+
+    const labelEl = document.createElement("span");
+    labelEl.className = "control-row__label";
+    labelEl.textContent = label;
+
+    const widgetWrap = document.createElement("div");
+    widgetWrap.className = "control-row__widget";
+    widgetWrap.appendChild(widget);
+
+    row.append(labelEl, widgetWrap);
+    return row;
+  }
+
+  _sliderRow(label, min, max, step, initial, onChange) {
+    const wrap = document.createElement("div");
+    wrap.style.display = "flex";
+    wrap.style.alignItems = "center";
+    wrap.style.gap = "6px";
+
+    const input = document.createElement("input");
+    input.type = "range";
+    input.min = min;
+    input.max = max;
+    input.step = step;
+    input.value = initial;
+
+    const valueEl = document.createElement("span");
+    valueEl.className = "control-row__value";
+    valueEl.textContent = Number(initial).toFixed(2);
+
+    input.addEventListener("input", () => {
+      const value = Number(input.value);
+      valueEl.textContent = value.toFixed(2);
+      onChange(value);
+    });
+
+    wrap.append(input, valueEl);
+    return this._row(label, wrap);
+  }
+
+  _colorRow(label, initialRgb, onChange) {
+    const input = document.createElement("input");
+    input.type = "color";
+    input.value = rgbFloatToHex(initialRgb);
+
+    input.addEventListener("input", () => {
+      onChange(hexToRgbFloat(input.value));
+    });
+
+    return this._row(label, input);
+  }
+
+  _checkboxRow(label, initialChecked, onChange) {
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = initialChecked;
+
+    input.addEventListener("change", () => onChange(input.checked));
+
+    return this._row(label, input);
+  }
+
+  _bindHoverPadding() {
+    this.root.addEventListener("mouseenter", () => {
+      this.ghost.setControlsPadding(-this.root.getBoundingClientRect().height);
+    });
+    this.root.addEventListener("mouseleave", () => {
+      this.ghost.setControlsPadding(0);
+    });
+  }
+}
+
+const canvas = document.getElementById("ghost-canvas");
+const ghost = new GhostCursor(canvas);
+new ControlPanel(ghost);
+ghost.start();
+</script>
+
+</body>
+</html>
