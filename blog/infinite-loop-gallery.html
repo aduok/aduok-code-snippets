@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Infinite loop gallery</title>
+<style>
+  :root{
+    --font-display: 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif;
+    --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'SF Mono', 'Consolas', 'Menlo', monospace;
+
+    --void:        #0a0a0f;
+    --void-deep:    #050508;
+    --plum:        #1b1023;
+    --ember:       #e8834b;
+    --ember-dim:   #a35a34;
+    --parchment:   #f1ede4;
+    --violet:      #6b5b95;
+    --glass:       rgba(20, 16, 26, 0.55);
+    --hairline:    rgba(241, 237, 228, 0.14);
+  }
+
+  *{ margin:0; padding:0; box-sizing:border-box; }
+
+  html, body{
+    width:100%; height:100%;
+    background:var(--void);
+    color:var(--parchment);
+    font-family:var(--font-body);
+    overflow:hidden;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  /* ---------- WebGL surface ---------- */
+
+  #orbit-stage{
+    position:fixed;
+    inset:0;
+    z-index:1;
+    cursor:grab;
+    touch-action:none;
+  }
+  #orbit-stage.dragging{ cursor:grabbing; }
+  #orbit-canvas{ position:absolute; inset:0; display:block; }
+
+  /* ---------- Chrome ---------- */
+
+  .chrome{
+    position:fixed;
+    z-index:5;
+    pointer-events:none;
+  }
+  .chrome > *{ pointer-events:auto; }
+
+  .hint{
+    top:24px; right:24px;
+    max-width:220px;
+    text-align:right;
+    font-family:var(--font-display);
+    font-weight:300;
+    font-size:1.7rem;
+    line-height:1.15;
+    text-transform:uppercase;
+    color:rgba(241,237,228,0.9);
+    letter-spacing:0.01em;
+  }
+  .hint em{ font-style:normal; color:var(--ember); }
+
+  @media (max-width: 760px){
+    .hint{ display:none; }
+  }
+
+  /* Signature element: a telemetry readout tracking loop position,
+     because the content genuinely is a rotating sequence — the
+     number here means something rather than decorating. */
+  .telemetry{
+    bottom:22px; left:50%;
+    transform:translateX(-50%);
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding:9px 16px;
+    background:var(--glass);
+    border:1px solid var(--hairline);
+    border-radius:100px;
+    backdrop-filter:blur(10px);
+    -webkit-backdrop-filter:blur(10px);
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:0.04em;
+    color:rgba(241,237,228,0.8);
+  }
+  .telemetry .dot{
+    width:6px; height:6px;
+    border-radius:50%;
+    background:var(--ember);
+    box-shadow:0 0 8px var(--ember);
+  }
+  .telemetry .split{ color:rgba(241,237,228,0.25); }
+  .telemetry .figure{ color:var(--parchment); min-width:2.6em; display:inline-block; }
+
+
+
+  /* ---------- Fullscreen toggle ---------- */
+
+  .fullscreen-btn{
+    position:fixed;
+    right:22px; bottom:22px;
+    z-index:5;
+    width:42px; height:42px;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:50%;
+    background:var(--glass);
+    border:1px solid var(--hairline);
+    backdrop-filter:blur(10px);
+    -webkit-backdrop-filter:blur(10px);
+    color:var(--parchment);
+    cursor:pointer;
+    transition:background 0.25s ease, transform 0.2s ease, border-color 0.25s ease;
+  }
+  .fullscreen-btn:hover{ background:rgba(232,131,75,0.18); border-color:var(--ember-dim); transform:scale(1.06); }
+  .fullscreen-btn:active{ transform:scale(0.94); }
+  .fullscreen-btn svg{ pointer-events:none; }
+  .fullscreen-btn.hidden{ display:none !important; }
+  .fullscreen-btn:focus-visible{ outline:2px solid var(--ember); outline-offset:2px; }
+
+  /* ---------- Loading veil ---------- */
+
+  .veil{
+    position:fixed; inset:0; z-index:10;
+    background:var(--void);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:16px;
+    transition:opacity 0.6s ease;
+  }
+  .veil.hidden{ opacity:0; pointer-events:none; }
+  .veil .word{
+    font-family:var(--font-display);
+    font-weight:500;
+    font-size:13px;
+    letter-spacing:0.2em;
+    text-transform:uppercase;
+    color:rgba(241,237,228,0.7);
+  }
+  .veil .bar{
+    width:180px; height:2px;
+    background:rgba(241,237,228,0.12);
+    overflow:hidden;
+    border-radius:2px;
+  }
+  .veil .bar-fill{
+    height:100%; width:0%;
+    background:var(--ember);
+    transition:width 0.25s ease;
+  }
+
+  a{ color:var(--ember); }
+</style>
+</head>
+<body>
+
+  <div class="veil" id="veil">
+    <div class="word">Loading gallery</div>
+    <div class="bar"><div class="bar-fill" id="veilBar"></div></div>
+  </div>
+
+  <div id="orbit-stage">
+    <canvas id="orbit-canvas"></canvas>
+  </div>
+
+  <div class="chrome hint">drag to <em>tilt</em>, scroll to <em>orbit</em></div>
+
+  <div class="chrome telemetry" id="telemetry">
+    <span class="dot"></span>
+    <span>LOOP <span class="figure" id="loopDeg">000°</span></span>
+    <span class="split">/</span>
+    <span>FRAME <span class="figure" id="loopFrame">01</span></span>
+  </div>
+
+  <button class="fullscreen-btn" id="fullscreenBtn" aria-label="Enter fullscreen"></button>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+  (function(){
+    'use strict';
+
+    /* =====================================================================
+       ORBIT — an infinite spiral image loop rendered with Three.js.
+
+       Structure:
+         TextureAtlas   → loads photos, packs them into one canvas texture
+         SpiralGeometry → builds the ribbon of vertices that winds up the spiral
+         InputRig       → wheel / drag / touch → orbit offset + tilt
+         OrbitGallery    → wires the three pieces together and runs the render loop
+       ===================================================================== */
+
+    // Each seed below deterministically maps to one stable placeholder
+    // photo, so every frame gets a distinct, reliably-loading image.
+    const GALLERY_SEEDS = [
+      'orbit-atlas', 'orbit-basalt', 'orbit-canyon', 'orbit-delta',
+      'orbit-ember', 'orbit-fjord', 'orbit-glacier', 'orbit-harbor',
+      'orbit-isle', 'orbit-junction', 'orbit-kelp', 'orbit-lattice',
+      'orbit-mesa', 'orbit-nebula', 'orbit-outpost', 'orbit-plateau',
+      'orbit-quarry', 'orbit-ridge',
+    ];
+    const GALLERY_IMAGES = GALLERY_SEEDS.map(
+      (seed) => `https://picsum.photos/seed/${seed}/900/650`
+    );
+
+    const SPIRAL_CONFIG = {
+      frameHeight: 6.6,
+      frameGap: 0.045,
+      radius: 3.4,
+      turns: 2.6,
+      height: 13,
+      curvature: 0.16,
+      tiltX: -0.16,
+      tiltZ: 0.1,
+    };
+
+    const INPUT_CONFIG = {
+      wheelSensitivity: 0.00075,
+      touchSensitivity: 0.0026,
+      friction: 0.945,
+      smoothing: 0.9,
+      maxSpeed: 0.045,
+      dragTiltLimit: 0.34,
+    };
+
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+    const lerp = (a, b, t) => a + (b - a) * t;
+
+    /* ----------------------------- TextureAtlas ----------------------------- */
+    /* Loads every source image and packs them left-to-right into a single
+       canvas texture, preserving each photo's native aspect ratio. Returns
+       both the texture and the list of aspect ratios so the geometry step
+       can size each frame correctly. */
+
+    class TextureAtlas {
+      constructor(urls, { rowHeight = 520, onProgress } = {}) {
+        this.urls = urls;
+        this.rowHeight = rowHeight;
+        this.onProgress = onProgress || (() => {});
+      }
+
+      load() {
+        const loaders = this.urls.map((url) => this._loadOne(url));
+        return Promise.all(loaders).then((frames) => this._pack(frames));
+      }
+
+      _loadOne(url) {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            this._reportProgress();
+            resolve({ image: img, ratio: img.naturalWidth / img.naturalHeight });
+          };
+          img.onerror = () => {
+            this._reportProgress();
+            resolve({ image: null, ratio: 0.8 }); // graceful fallback slot
+          };
+          img.src = url;
+        });
+      }
+
+      _reportProgress() {
+        this._loaded = (this._loaded || 0) + 1;
+        this.onProgress(this._loaded / this.urls.length);
+      }
+
+      _pack(frames) {
+        const h = this.rowHeight;
+        const widths = frames.map((f) => Math.round(f.ratio * h));
+        const totalWidth = widths.reduce((sum, w) => sum + w, 0);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = totalWidth;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#0a0a0f';
+        ctx.fillRect(0, 0, totalWidth, h);
+
+        let cursor = 0;
+        frames.forEach((frame, i) => {
+          if (frame.image) ctx.drawImage(frame.image, cursor, 0, widths[i], h);
+          cursor += widths[i];
+        });
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.ClampToEdgeWrapping;
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        texture.generateMipmaps = false;
+
+        return { texture, ratios: frames.map((f) => f.ratio), widths, totalWidth, rowHeight: h };
+      }
+    }
+
+    /* --------------------------- SpiralGeometry --------------------------- */
+    /* Builds a single ribbon mesh whose vertices are bent into a helix.
+       UVs are remapped per-frame so each photo keeps its own slot in the
+       atlas and gets a thin gap on either side. */
+
+    class SpiralGeometry {
+      static build(atlasResult, config) {
+        const { ratios, widths, totalWidth } = atlasResult;
+        const frameCount = ratios.length;
+        const segmentsAlong = 220 + frameCount * 16;
+        const segmentsAcross = 20;
+
+        const geometry = new THREE.PlaneGeometry(
+          totalWidth / atlasResult.rowHeight * config.frameHeight,
+          config.frameHeight,
+          segmentsAlong,
+          segmentsAcross
+        );
+
+        const boundaries = [0];
+        widths.forEach((w) => boundaries.push(boundaries[boundaries.length - 1] + w / totalWidth));
+
+        SpiralGeometry._remapUVs(geometry, boundaries, config.frameGap);
+        SpiralGeometry._bendIntoHelix(geometry, config);
+
+        geometry.computeVertexNormals();
+        return geometry;
+      }
+
+      static _remapUVs(geometry, boundaries, gap) {
+        const uv = geometry.attributes.uv;
+        const usable = 1 - gap;
+
+        for (let i = 0; i < uv.count; i++) {
+          const u = clamp(uv.getX(i), 0, 0.999999);
+          let slot = boundaries.length - 2;
+          for (let j = 0; j < boundaries.length - 1; j++) {
+            if (u >= boundaries[j] && u < boundaries[j + 1]) { slot = j; break; }
+          }
+          const span = boundaries[slot + 1] - boundaries[slot];
+          let local = (u - boundaries[slot]) / span;
+          local = clamp(local / usable, 0.0015, 0.9985);
+          uv.setX(i, boundaries[slot] + local * span);
+        }
+      }
+
+      static _bendIntoHelix(geometry, config) {
+        const position = geometry.attributes.position;
+        const width = geometry.parameters.width;
+
+        for (let i = 0; i < position.count; i++) {
+          const x = position.getX(i);
+          const y = position.getY(i);
+          const t = clamp((x + width / 2) / width, 0, 1);
+
+          const angle = t * Math.PI * 2 * config.turns;
+          const radius = config.radius * (1 - t * config.curvature * 0.4);
+
+          const px = Math.sin(angle) * radius;
+          const pz = Math.cos(angle) * radius;
+          const py = (t - 0.5) * config.height + y * 0.32;
+
+          position.setXYZ(i, px, py, pz);
+        }
+      }
+    }
+
+    /* ------------------------------- InputRig ------------------------------- */
+    /* Turns wheel, mouse-drag and touch gestures into two outputs the
+       gallery cares about: `orbitOffset` (how far we've scrolled around
+       the loop) and `tilt` (a small camera-relative rotation from dragging). */
+
+    class InputRig {
+      constructor(target, config) {
+        this.target = target;
+        this.config = config;
+
+        this.orbitOffset = 0;
+        this.velocity = 0;
+        this._targetVelocity = 0;
+
+        this.tilt = { x: 0, z: 0 };
+        this._dragStart = null;
+        this._pinchStart = null;
+
+        this._bind();
+      }
+
+      _bind() {
+        this.target.addEventListener('wheel', (e) => this._onWheel(e), { passive: false });
+
+        this.target.addEventListener('mousedown', (e) => this._onDragStart(e.clientX, e.clientY));
+        window.addEventListener('mousemove', (e) => this._onDragMove(e.clientX, e.clientY));
+        window.addEventListener('mouseup', () => this._onDragEnd());
+
+        this.target.addEventListener('touchstart', (e) => this._onTouchStart(e), { passive: false });
+        this.target.addEventListener('touchmove', (e) => this._onTouchMove(e), { passive: false });
+        this.target.addEventListener('touchend', () => this._onDragEnd());
+      }
+
+      _onWheel(e) {
+        e.preventDefault();
+        const delta = e.deltaY * this.config.wheelSensitivity;
+        this._targetVelocity = clamp(
+          lerp(this._targetVelocity, this._targetVelocity + delta, 1 - this.config.smoothing),
+          -this.config.maxSpeed,
+          this.config.maxSpeed
+        );
+      }
+
+      _onDragStart(x, y) {
+        this._dragStart = { x, y, tiltX: this.tilt.x, tiltZ: this.tilt.z };
+        this.target.classList.add('dragging');
+      }
+
+      _onDragMove(x, y) {
+        if (!this._dragStart) return;
+        const dx = x - this._dragStart.x;
+        const dy = y - this._dragStart.y;
+        const limit = this.config.dragTiltLimit;
+        this.tilt.z = clamp(this._dragStart.tiltZ + dx * 0.002, -limit, limit);
+        this.tilt.x = clamp(this._dragStart.tiltX - dy * 0.002, -limit, limit);
+      }
+
+      _onDragEnd() {
+        this._dragStart = null;
+        this.target.classList.remove('dragging');
+      }
+
+      _onTouchStart(e) {
+        if (e.touches.length === 1) {
+          this._onDragStart(e.touches[0].clientX, e.touches[0].clientY);
+          this._lastTouchY = e.touches[0].clientY;
+        }
+      }
+
+      _onTouchMove(e) {
+        e.preventDefault();
+        if (e.touches.length === 1) {
+          const y = e.touches[0].clientY;
+          const dy = y - this._lastTouchY;
+          this._targetVelocity = clamp(
+            this._targetVelocity + dy * this.config.touchSensitivity * -1,
+            -this.config.maxSpeed * 1.4,
+            this.config.maxSpeed * 1.4
+          );
+          this._lastTouchY = y;
+          this._onDragMove(e.touches[0].clientX, y);
+        }
+      }
+
+      /** Advance the physics one animation-frame tick. */
+      update() {
+        this._targetVelocity *= this.config.friction;
+        this.velocity = lerp(this.velocity, this._targetVelocity, 1 - this.config.smoothing);
+        if (Math.abs(this.velocity) > 0.00005) {
+          this.orbitOffset += this.velocity;
+        } else {
+          this.velocity = 0;
+        }
+      }
+    }
+
+    /* ------------------------------ OrbitGallery ----------------------------- */
+
+    class OrbitGallery {
+      constructor({ canvas, images, spiralConfig, inputConfig, onLoadProgress }) {
+        this.canvas = canvas;
+        this.images = images;
+        this.spiralConfig = spiralConfig;
+        this.inputConfig = inputConfig;
+        this.onLoadProgress = onLoadProgress || (() => {});
+      }
+
+      async init() {
+        this._setupScene();
+        this._setupLights();
+
+        const atlas = new TextureAtlas(this.images, { onProgress: this.onLoadProgress });
+        const atlasResult = await atlas.load();
+
+        this._buildMesh(atlasResult);
+        this.frameCount = atlasResult.ratios.length;
+
+        this.input = new InputRig(document.getElementById('orbit-stage'), this.inputConfig);
+
+        window.addEventListener('resize', () => this._onResize());
+        this._bindZoomKeys();
+
+        this._loop = this._loop.bind(this);
+        requestAnimationFrame(this._loop);
+      }
+
+      _setupScene() {
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0x0a0a0f);
+
+        this.camera = new THREE.PerspectiveCamera(
+          48, window.innerWidth / window.innerHeight, 0.1, 1000
+        );
+        this.zoom = 1;
+        this._positionCamera();
+
+        this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+
+        this.rig = new THREE.Group();
+        this.rig.rotation.x = this.spiralConfig.tiltX;
+        this.rig.rotation.z = this.spiralConfig.tiltZ;
+        this.scene.add(this.rig);
+      }
+
+      _setupLights() {
+        this.scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+        const key = new THREE.DirectionalLight(0xffe8d6, 0.85);
+        key.position.set(5, 8, 6);
+        this.scene.add(key);
+      }
+
+      _buildMesh(atlasResult) {
+        this.material = new THREE.ShaderMaterial({
+          uniforms: {
+            map: { value: atlasResult.texture },
+            offset: { value: 0 },
+          },
+          vertexShader: `
+            varying vec2 vUv;
+            void main() {
+              vUv = uv;
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+          `,
+          fragmentShader: `
+            uniform sampler2D map;
+            uniform float offset;
+            varying vec2 vUv;
+            void main() {
+              float u = fract(vUv.x + offset);
+              gl_FragColor = texture2D(map, vec2(u, vUv.y));
+            }
+          `,
+          side: THREE.DoubleSide,
+          transparent: true,
+        });
+
+        const geometry = SpiralGeometry.build(atlasResult, this.spiralConfig);
+        this.mesh = new THREE.Mesh(geometry, this.material);
+        this.mesh.rotation.x = 0.32;
+        this.rig.add(this.mesh);
+      }
+
+      _positionCamera() {
+        this.camera.position.set(0, 3.2 / this.zoom, 8.6 / this.zoom);
+      }
+
+      _bindZoomKeys() {
+        const MIN_ZOOM = 0.82, MAX_ZOOM = 1.15, STEP = 0.05;
+        window.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+            this.zoom = clamp(this.zoom + STEP, MIN_ZOOM, MAX_ZOOM);
+            this._positionCamera();
+          } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+            this.zoom = clamp(this.zoom - STEP, MIN_ZOOM, MAX_ZOOM);
+            this._positionCamera();
+          }
+        });
+      }
+
+      _onResize() {
+        this.camera.aspect = window.innerWidth / window.innerHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+
+      _loop() {
+        requestAnimationFrame(this._loop);
+
+        this.input.update();
+        let offset = this.input.orbitOffset % 1;
+        if (offset < 0) offset += 1;
+        this.material.uniforms.offset.value = offset;
+
+        this.rig.rotation.x = lerp(this.rig.rotation.x, this.spiralConfig.tiltX + this.input.tilt.x, 0.12);
+        this.rig.rotation.z = lerp(this.rig.rotation.z, this.spiralConfig.tiltZ + this.input.tilt.z, 0.12);
+
+        this._updateTelemetry(offset);
+
+        this.renderer.render(this.scene, this.camera);
+      }
+
+      _updateTelemetry(offset) {
+        const degEl = document.getElementById('loopDeg');
+        const frameEl = document.getElementById('loopFrame');
+        if (!degEl || !frameEl) return;
+        const degrees = Math.round(offset * 360);
+        const frame = (Math.floor(offset * this.frameCount) % this.frameCount) + 1;
+        degEl.textContent = String(degrees).padStart(3, '0') + '°';
+        frameEl.textContent = String(frame).padStart(2, '0');
+      }
+    }
+
+    /* --------------------------- Fullscreen control --------------------------- */
+
+    class FullscreenToggle {
+      constructor(button) {
+        this.button = button;
+        this.icons = {
+          enter: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>',
+          exit:  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>',
+        };
+        if (!this._supported()) {
+          this.button.classList.add('hidden');
+          return;
+        }
+        this.button.addEventListener('click', () => this.toggle());
+        ['fullscreenchange', 'webkitfullscreenchange'].forEach((evt) =>
+          document.addEventListener(evt, () => this._refreshIcon())
+        );
+        this._refreshIcon();
+      }
+
+      _supported() {
+        const el = document.documentElement;
+        return !!(el.requestFullscreen || el.webkitRequestFullscreen);
+      }
+
+      _isActive() {
+        return !!(document.fullscreenElement || document.webkitFullscreenElement);
+      }
+
+      async toggle() {
+        try {
+          if (this._isActive()) {
+            await (document.exitFullscreen ? document.exitFullscreen() : document.webkitExitFullscreen());
+          } else {
+            const el = document.documentElement;
+            await (el.requestFullscreen ? el.requestFullscreen() : el.webkitRequestFullscreen());
+          }
+        } catch (err) {
+          console.warn('Fullscreen request failed:', err);
+        }
+      }
+
+      _refreshIcon() {
+        const active = this._isActive();
+        this.button.innerHTML = active ? this.icons.exit : this.icons.enter;
+        this.button.setAttribute('aria-label', active ? 'Exit fullscreen' : 'Enter fullscreen');
+      }
+    }
+
+    /* ---------------------------------- Boot ---------------------------------- */
+
+    function boot() {
+      const veil = document.getElementById('veil');
+      const veilBar = document.getElementById('veilBar');
+      const telemetry = document.getElementById('telemetry');
+
+      new FullscreenToggle(document.getElementById('fullscreenBtn'));
+
+      const gallery = new OrbitGallery({
+        canvas: document.getElementById('orbit-canvas'),
+        images: GALLERY_IMAGES,
+        spiralConfig: SPIRAL_CONFIG,
+        inputConfig: INPUT_CONFIG,
+        onLoadProgress: (fraction) => { veilBar.style.width = (fraction * 100).toFixed(0) + '%'; },
+      });
+
+      gallery.init().then(() => {
+        veil.classList.add('hidden');
+      });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', boot);
+    } else {
+      boot();
+    }
+  })();
+  </script>
+</body>
+</html>
