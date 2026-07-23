@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Water — ripple surface</title>
+<style>
+  :root{
+    --deep: #061f33;
+    --mid: #103f66;
+    --shallow: #2f6fa3;
+    --glint: #ffffff;
+    --paper: #eaf6ff;
+    --panel-bg: rgba(6, 26, 44, 0.55);
+    --panel-border: rgba(255,255,255,0.16);
+    --cycle: 3s;
+  }
+
+  *{ box-sizing: border-box; }
+
+  html, body{
+    margin: 0;
+    height: 100%;
+    background: var(--deep);
+    overflow: hidden;
+    font-family: "IBM Plex Mono", "SFMono-Regular", ui-monospace, Menlo, monospace;
+  }
+
+  body{
+    display: grid;
+    place-items: center;
+  }
+
+  /* backdrop: deep blue water rather than a flat diagonal */
+  .backdrop{
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(65% 50% at 70% 12%, rgba(255,255,255,0.22), transparent 65%),
+      linear-gradient(165deg, #041526 0%, var(--deep) 30%, var(--mid) 65%, var(--shallow) 100%);
+    z-index: 0;
+  }
+
+  .field{
+    position: relative;
+    z-index: 1;
+    width: min(96vw, 1400px);
+    aspect-ratio: 16/10;
+    container-type: inline-size;
+    display: grid;
+    place-items: center;
+  }
+
+  .field.is-blurred .ring{ filter: blur(4px); }
+
+  .ring{
+    position: absolute;
+    aspect-ratio: 3;
+    border-radius: 50%;
+    border: 1px solid rgba(220, 238, 252, 0.8);
+    box-shadow:
+      inset 3px -3px 10px rgba(255,255,255,0.22),
+      inset -2px 2px 8px rgba(3,18,30,0.4);
+    animation: wobble var(--cycle) ease-in-out infinite alternate;
+    will-change: transform, opacity;
+  }
+
+  @keyframes wobble{
+    0%   { transform: translateY(0.6cqi) scaleY(0.94); }
+    100% { transform: translateY(-0.6cqi) scaleY(1.06); }
+  }
+
+  /* ---------- control deck ---------- */
+
+  .deck{
+    position: fixed;
+    top: 22px;
+    right: 22px;
+    z-index: 10;
+    color: var(--paper);
+  }
+
+  .deck-toggle{
+    appearance: none;
+    border: 1px solid var(--panel-border);
+    background: var(--panel-bg);
+    backdrop-filter: blur(10px);
+    color: var(--paper);
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: transform .3s ease, border-color .2s ease;
+  }
+
+  .deck-toggle:hover{ border-color: var(--glint); }
+  .deck-toggle svg{ transition: transform .35s ease; }
+  .deck.is-open .deck-toggle svg{ transform: rotate(135deg); }
+
+  .deck-panel{
+    position: absolute;
+    top: 54px;
+    right: 0;
+    width: 240px;
+    padding: 18px 18px 20px;
+    border: 1px solid var(--panel-border);
+    background: var(--panel-bg);
+    backdrop-filter: blur(14px);
+    border-radius: 16px 4px 16px 16px;
+    display: grid;
+    gap: 14px;
+    opacity: 0;
+    transform: translateY(-6px) scale(.98);
+    pointer-events: none;
+    transition: opacity .22s ease, transform .22s ease;
+  }
+
+  .deck.is-open .deck-panel{
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+
+  .row{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: rgba(234,246,255,0.75);
+  }
+
+  .stepper{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stepper button{
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 1px solid rgba(234,246,255,0.4);
+    background: transparent;
+    color: var(--paper);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: border-color .15s ease, opacity .15s ease;
+  }
+
+  .stepper button:disabled{
+    opacity: .25;
+    cursor: default;
+  }
+
+  .stepper button:not(:disabled):hover{ border-color: var(--glint); }
+
+  .stepper .value{
+    min-width: 2.2ch;
+    text-align: center;
+    color: var(--paper);
+    font-size: 13px;
+  }
+
+  .switch{
+    appearance: none;
+    width: 36px;
+    height: 20px;
+    border-radius: 999px;
+    border: 1px solid rgba(234,246,255,0.4);
+    background: transparent;
+    position: relative;
+    cursor: pointer;
+    transition: border-color .2s ease, background .2s ease;
+  }
+
+  .switch::after{
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--paper);
+    transition: transform .2s ease;
+  }
+
+  .switch.is-on{
+    background: rgba(47,111,163,0.5);
+    border-color: var(--glint);
+  }
+
+  .switch.is-on::after{ transform: translateX(16px); }
+
+  .credit{
+    position: fixed;
+    bottom: 16px;
+    left: 18px;
+    z-index: 10;
+    color: rgba(234,246,255,0.35);
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .ring{ animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="backdrop"></div>
+
+<main class="field" id="field">
+  <!-- rings injected by JS -->
+</main>
+
+<div class="deck" id="deck">
+  <button class="deck-toggle" id="deckToggle" title="Ripple controls" aria-expanded="false">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M8 1V15M1 8H15" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+    </svg>
+  </button>
+
+  <div class="deck-panel">
+    <div class="row">
+      <span>Blur</span>
+      <button class="switch is-on" id="blurSwitch" aria-pressed="true"></button>
+    </div>
+
+    <div class="row">
+      <span>Ripples</span>
+      <div class="stepper" data-stepper="ripples">
+        <button data-dir="-1" aria-label="Fewer ripples">−</button>
+        <span class="value" id="rippleValue">4</span>
+        <button data-dir="1" aria-label="More ripples">+</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <span>Speed</span>
+      <div class="stepper" data-stepper="speed">
+        <button data-dir="-1" aria-label="Slower">−</button>
+        <span class="value" id="speedValue">3x</span>
+        <button data-dir="1" aria-label="Faster">+</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="credit">water surface — a stone dropped in still water</div>
+
+<script>
+(() => {
+  const field   = document.getElementById('field');
+  const deck    = document.getElementById('deck');
+  const toggle  = document.getElementById('deckToggle');
+  const blurBtn = document.getElementById('blurSwitch');
+  const rippleValue = document.getElementById('rippleValue');
+  const speedValue  = document.getElementById('speedValue');
+
+  const CYCLE_SECONDS = { 1: 2, 2: 1, 3: 0.5, 4: 0.25 };
+  const RIPPLE_RANGE   = { min: 3, max: 5 };
+  const SPEED_RANGE    = { min: 1, max: 4 };
+
+  const state = {
+    blurred: true,
+    ripples: 4,
+    speed: 3,
+    ringCount: 60
+  };
+
+  // how many rings to draw for the current viewport — denser on wide screens
+  function ringCountForWidth(w){
+    return Math.max(20, Math.min(100, Math.round(w / 20)));
+  }
+
+  function buildRings(){
+    field.querySelectorAll('.ring').forEach(r => r.remove());
+    const total = state.ringCount;
+    const frag = document.createDocumentFragment();
+
+    for (let i = 1; i <= total; i++){
+      const ring = document.createElement('div');
+      ring.className = 'ring';
+      const widthPct = (i / total) * 100;
+      const opacity  = 1 - (i / total);
+      // stagger each ring's animation so groups of rings ripple outward together
+      const delay = -2 * (state.speed_seconds) * state.ripples +
+                    (2 * state.speed_seconds / (total / state.ripples)) * i;
+
+      ring.style.width = widthPct + 'cqi';
+      ring.style.opacity = opacity.toFixed(3);
+      ring.style.animationDuration = state.speed_seconds + 's';
+      ring.style.animationDelay = delay.toFixed(3) + 's';
+      frag.appendChild(ring);
+    }
+    field.appendChild(frag);
+  }
+
+  function render(){
+    state.speed_seconds = CYCLE_SECONDS[state.speed];
+    field.classList.toggle('is-blurred', state.blurred);
+    blurBtn.classList.toggle('is-on', state.blurred);
+    blurBtn.setAttribute('aria-pressed', String(state.blurred));
+    rippleValue.textContent = state.ripples;
+    speedValue.textContent  = state.speed + 'x';
+
+    document.querySelectorAll('[data-stepper] button').forEach(btn => {
+      const kind = btn.closest('[data-stepper]').dataset.stepper;
+      const dir  = Number(btn.dataset.dir);
+      const range = kind === 'ripples' ? RIPPLE_RANGE : SPEED_RANGE;
+      const current = kind === 'ripples' ? state.ripples : state.speed;
+      btn.disabled = (dir === -1 && current <= range.min) || (dir === 1 && current >= range.max);
+    });
+
+    buildRings();
+  }
+
+  // ---- interactions ----
+
+  toggle.addEventListener('click', () => {
+    const open = deck.classList.toggle('is-open');
+    toggle.setAttribute('aria-expanded', String(open));
+  });
+
+  blurBtn.addEventListener('click', () => {
+    state.blurred = !state.blurred;
+    render();
+  });
+
+  document.querySelectorAll('[data-stepper]').forEach(group => {
+    const kind = group.dataset.stepper;
+    group.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const dir = Number(btn.dataset.dir);
+        const range = kind === 'ripples' ? RIPPLE_RANGE : SPEED_RANGE;
+        const key = kind === 'ripples' ? 'ripples' : 'speed';
+        state[key] = Math.max(range.min, Math.min(range.max, state[key] + dir));
+        render();
+      });
+    });
+  });
+
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      state.ringCount = ringCountForWidth(window.innerWidth);
+      render();
+    }, 120);
+  });
+
+  state.ringCount = ringCountForWidth(window.innerWidth);
+  render();
+})();
+</script>
+
+</body>
+</html>
