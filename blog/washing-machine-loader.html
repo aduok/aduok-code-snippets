@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Washing Machine Loader</title>
+<style>
+  :root {
+    --wm-body: #ffffff;
+    --wm-shadow: #999999;
+    --wm-shadow-deep: rgba(0, 0, 0, 0.25);
+    --wm-panel-dark: #dddddd;
+    --wm-panel-darker: #bbbbbb;
+    --wm-foot: #aaaaaa;
+    --wm-knob-outer: #aaaaaa;
+    --wm-knob-inner: #eeeeee;
+    --wm-drum-frame: #dddddd;
+    --wm-drum-water: #bbdefb;
+    --wm-drum-glass-a: #64b5f6;
+    --wm-drum-glass-b: #607d8b;
+
+    --wm-width: 120px;
+    --wm-height: 150px;
+    --wm-cycle-duration: 3s;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f2f2f2;
+  }
+
+  .washing-machine {
+    position: relative;
+    width: var(--wm-width);
+    height: var(--wm-height);
+    background-color: var(--wm-body);
+    border-radius: 6%;
+    transform-origin: 50% 120%;
+    animation: wm-shake var(--wm-cycle-duration) ease-in-out infinite;
+  }
+
+  /* top control panel + side trim, built from layered gradients */
+  .washing-machine::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 6%;
+    background-repeat: no-repeat;
+    background-image:
+      linear-gradient(var(--wm-panel-dark) 50%, var(--wm-panel-darker) 51%),
+      linear-gradient(var(--wm-panel-dark), var(--wm-panel-dark)),
+      linear-gradient(var(--wm-panel-dark), var(--wm-panel-dark));
+    background-position:
+      0 20px,
+      45px 0,
+      8px 6px;
+    background-size:
+      100% 4px,
+      1px 23px,
+      30px 8px;
+  }
+
+  /* two control knobs */
+  .washing-machine__knobs {
+    position: absolute;
+    inset: 0;
+    background-repeat: no-repeat;
+    background-image:
+      radial-gradient(ellipse at center, var(--wm-knob-outer) 25%, var(--wm-knob-inner) 26%, var(--wm-knob-inner) 50%, transparent 55%),
+      radial-gradient(ellipse at center, var(--wm-knob-outer) 25%, var(--wm-knob-inner) 26%, var(--wm-knob-inner) 50%, transparent 55%),
+      radial-gradient(ellipse at center, var(--wm-knob-outer) 25%, var(--wm-knob-inner) 26%, var(--wm-knob-inner) 50%, transparent 55%);
+    background-position: 55px 3px, 75px 3px, 95px 3px;
+    background-size: 15px 15px, 15px 15px, 15px 15px;
+  }
+
+  /* the two little rubber feet at the bottom */
+  .washing-machine__feet {
+    position: absolute;
+    left: 5px;
+    top: 100%;
+    width: 7px;
+    height: 5px;
+    background: var(--wm-foot);
+    border-radius: 0 0 4px 4px;
+    box-shadow: 102px 0 var(--wm-foot);
+  }
+
+  /* the porthole / drum, spins independently */
+  .washing-machine__drum {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 20px;
+    margin: 0 auto;
+    box-sizing: border-box;
+    width: 95px;
+    height: 95px;
+    border-radius: 50%;
+    border: 10px solid var(--wm-drum-frame);
+    box-shadow:
+      0 0 0 4px var(--wm-shadow) inset,
+      0 0 6px 6px var(--wm-shadow-deep) inset;
+    background-color: var(--wm-drum-water);
+    background-repeat: repeat, no-repeat;
+    background-position: 0 0;
+    background-size: 30px 100%, 90px 80px;
+    background-image:
+      linear-gradient(to right, rgba(0, 0, 0, 0.27) 0%, rgba(0, 0, 0, 0.27) 49%, transparent 50%, transparent 100%),
+      linear-gradient(135deg, var(--wm-drum-glass-a) 50%, var(--wm-drum-glass-b) 51%);
+    animation: wm-spin var(--wm-cycle-duration) ease-in-out infinite;
+  }
+
+  @keyframes wm-spin {
+    0%   { transform: rotate(0deg); }
+    50%  { transform: rotate(360deg); }
+    75%  { transform: rotate(750deg); }
+    100% { transform: rotate(1800deg); }
+  }
+
+  @keyframes wm-shake {
+    0%, 50%, 100%      { transform: rotate(0deg); }
+    50.001%, 75%, 84%, 92%  { transform: rotate(-0.5deg); }
+    65%, 80%, 88%, 96%      { transform: rotate(0.5deg); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .washing-machine,
+    .washing-machine__drum {
+      animation: none;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="washing-machine">
+    <div class="washing-machine__knobs"></div>
+    <div class="washing-machine__feet"></div>
+    <div class="washing-machine__drum"></div>
+  </div>
+</body>
+</html>
