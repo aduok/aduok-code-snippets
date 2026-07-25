@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pop Buttons</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Titan+One&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "Titan One", sans-serif;
+    background: #2b1d3d;
+    padding: 2rem;
+  }
+
+  .btns {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 1em;
+    width: fit-content;
+    margin: 0 auto;
+    padding: 0;
+  }
+
+  .btn {
+    text-decoration: none;
+    width: 8em;
+    display: block;
+    opacity: 0;
+    animation: entrance 0.85s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
+  }
+
+  .btns li:nth-child(1) .btn { animation-delay: 0s; }
+  .btns li:nth-child(2) .btn { animation-delay: 0.1s; }
+  .btns li:nth-child(3) .btn { animation-delay: 0.2s; }
+  .btns li:nth-child(4) .btn { animation-delay: 0.3s; }
+
+  .btn span {
+    display: block;
+    max-width: 100%;
+    background: #ff6b4a;
+    padding: 1em;
+    text-align: center;
+    color: #fff8f2;
+    font-size: 1em;
+    box-shadow: 4px 4px 0 #1a1026;
+    border-radius: 20px;
+    transition: all 0.2s cubic-bezier(0.7, -0.35, 0.27, 1.55);
+    pointer-events: none;
+  }
+
+  .btn:hover span,
+  .btn:focus-visible span {
+    box-shadow: 4px 4px 0 #1a1026, 0 0 0 3px #fff8f2 inset;
+    font-size: 1.2em;
+    background: #ffb830;
+    color: #1a1026;
+    animation: squish 0.1s 1 ease-in forwards;
+  }
+
+  .btn:focus-visible {
+    outline: 3px solid #fff8f2;
+    outline-offset: 4px;
+    border-radius: 20px;
+  }
+
+  @keyframes squish {
+    0%   { transform: scale(1.2, 0.58) rotate(-5deg); }
+    100% { transform: scale(1, 1) rotate(-4deg); }
+  }
+
+  @keyframes entrance {
+    0%   { opacity: 0; transform: translateY(50px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .btn { animation: none; opacity: 1; }
+    .btn:hover span, .btn:focus-visible span { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<ul class="btns">
+  <li><a class="btn" href="#"><span>MANGO</span></a></li>
+  <li><a class="btn" href="#"><span>PEACH</span></a></li>
+  <li><a class="btn" href="#"><span>GUAVA</span></a></li>
+  <li><a class="btn" href="#"><span>LYCHEE</span></a></li>
+</ul>
+
+</body>
+</html>
