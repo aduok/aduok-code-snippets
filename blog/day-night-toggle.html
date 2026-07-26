@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Day / Night Toggle</title>
+<style>
+  :root{
+    --sky-day-a: #8ec9f0;
+    --sky-day-b: #cdeffc;
+    --sky-day-c: #eef8ff;
+    --sky-night-a: #0b1026;
+    --sky-night-b: #1b2247;
+    --sky-night-c: #2a2f5c;
+    --sun-core: #ffd166;
+    --sun-edge: #ff9f1c;
+    --moon-core: #f4f4f8;
+    --moon-edge: #cfd2e0;
+    --panel-bg: #f4f5f7;
+    --track-off: #d7d5e0;
+    --track-on: #5b4b8a;
+    --thumb: #ffffff;
+    --ink: #2b2b33;
+    --ink-soft: #7a7a86;
+    --ease: cubic-bezier(.65,0,.35,1);
+  }
+
+  * { box-sizing: border-box; }
+
+  body{
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--panel-bg);
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+
+  .widget{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    padding: 28px;
+  }
+
+  .sky{
+    position: relative;
+    width: 320px;
+    height: 160px;
+    border-radius: 26px;
+    overflow: hidden;
+    background: linear-gradient(160deg, var(--sky-day-a) 0%, var(--sky-day-b) 55%, var(--sky-day-c) 100%);
+    box-shadow: 0 18px 40px -18px rgba(20,20,40,.35), inset 0 0 0 1px rgba(255,255,255,.25);
+    transition: background 600ms var(--ease);
+  }
+
+  .sky[data-mode="night"]{
+    background: linear-gradient(160deg, var(--sky-night-a) 0%, var(--sky-night-b) 55%, var(--sky-night-c) 100%);
+  }
+
+  .stars{
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 600ms var(--ease);
+  }
+
+  .sky[data-mode="night"] .stars{ opacity: 1; }
+
+  .star{
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background: #fff;
+    animation: twinkle 2.6s ease-in-out infinite;
+  }
+
+  @keyframes twinkle{
+    0%, 100% { opacity: .25; }
+    50% { opacity: 1; }
+  }
+
+  .cloud{
+    position: absolute;
+    width: 70px;
+    height: 22px;
+    border-radius: 50px;
+    background: rgba(255,255,255,.85);
+    filter: blur(.3px);
+    transition: opacity 600ms var(--ease), transform 8s linear;
+  }
+
+  .cloud::before, .cloud::after{
+    content: "";
+    position: absolute;
+    background: inherit;
+    border-radius: 50%;
+  }
+
+  .cloud::before{ width: 34px; height: 34px; top: -16px; left: 8px; }
+  .cloud::after{ width: 26px; height: 26px; top: -10px; left: 36px; }
+
+  .cloud.c1{ top: 24px; left: 24px; animation: drift 22s linear infinite; }
+  .cloud.c2{ top: 46px; left: 150px; transform: scale(.7); animation: drift 30s linear infinite reverse; }
+
+  @keyframes drift{
+    0% { transform: translateX(0); }
+    50% { transform: translateX(14px); }
+    100% { transform: translateX(0); }
+  }
+
+  .sky[data-mode="night"] .cloud{ opacity: 0; }
+
+  .horizon{
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 46px;
+    background: #6fa5c9;
+    clip-path: polygon(0% 100%, 0% 60%, 15% 40%, 32% 55%, 50% 25%, 68% 50%, 84% 35%, 100% 55%, 100% 100%);
+    transition: background 600ms var(--ease);
+  }
+
+  .sky[data-mode="night"] .horizon{ background: #12162e; }
+
+  .celestial{
+    position: absolute;
+    top: 22px;
+    left: 10px;
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    transform: translateX(0);
+    transition: transform 700ms var(--ease), box-shadow 700ms var(--ease);
+    box-shadow: 0 8px 24px rgba(255,159,28,.45);
+  }
+
+  .sky[data-mode="night"] .celestial{
+    transform: translateX(230px);
+    box-shadow: 0 8px 20px rgba(0,0,0,.35);
+  }
+
+  .celestial .face{
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    transition: opacity 500ms var(--ease);
+  }
+
+  .celestial .sun{
+    background: radial-gradient(circle at 35% 30%, var(--sun-core), var(--sun-edge));
+    opacity: 1;
+  }
+
+  .celestial .moon{
+    background: radial-gradient(circle at 30% 30%, var(--moon-core), var(--moon-edge));
+    opacity: 0;
+    box-shadow:
+      inset -6px -4px 0 -2px rgba(0,0,0,.06),
+      inset 10px 12px 0 -14px rgba(0,0,0,.12),
+      inset -4px 16px 0 -16px rgba(0,0,0,.12);
+  }
+
+  .sky[data-mode="night"] .celestial .sun{ opacity: 0; }
+  .sky[data-mode="night"] .celestial .moon{ opacity: 1; }
+
+  .controls{
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .switch{
+    appearance: none;
+    -webkit-appearance: none;
+    border: none;
+    cursor: pointer;
+    width: 64px;
+    height: 32px;
+    border-radius: 20px;
+    background: var(--track-off);
+    padding: 3px;
+    display: flex;
+    align-items: center;
+    transition: background 300ms var(--ease);
+  }
+
+  .switch[aria-checked="true"]{ background: var(--track-on); }
+
+  .switch:focus-visible{
+    outline: 2px solid var(--track-on);
+    outline-offset: 3px;
+  }
+
+  .switch-thumb{
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--thumb);
+    box-shadow: 0 2px 6px rgba(0,0,0,.25);
+    transform: translateX(0);
+    transition: transform 300ms var(--ease);
+  }
+
+  .switch[aria-checked="true"] .switch-thumb{
+    transform: translateX(32px);
+  }
+
+  .labels{
+    display: flex;
+    gap: 6px;
+    font-size: 14px;
+    color: var(--ink-soft);
+  }
+
+  .labels span{
+    padding: 2px 4px;
+    transition: color 300ms var(--ease), font-weight 300ms var(--ease);
+  }
+
+  .labels span.active{
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation: none !important; transition-duration: 1ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="widget">
+  <div class="sky" id="sky" data-mode="day">
+    <div class="stars" id="stars"></div>
+    <div class="cloud c1"></div>
+    <div class="cloud c2"></div>
+    <div class="horizon"></div>
+    <div class="celestial">
+      <div class="face sun"></div>
+      <div class="face moon"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="switch" id="switchBtn" role="switch" aria-checked="false" aria-label="Toggle day and night">
+      <span class="switch-thumb"></span>
+    </button>
+    <div class="labels">
+      <span class="active" data-mode="day">Day</span>
+      <span data-mode="night">Night</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  const starsContainer = document.getElementById('stars');
+  const starCount = 24;
+  for (let i = 0; i < starCount; i++) {
+    const star = document.createElement('div');
+    star.className = 'star';
+    star.style.left = Math.random() * 100 + '%';
+    star.style.top = Math.random() * 55 + '%';
+    star.style.animationDelay = (Math.random() * 2.6) + 's';
+    starsContainer.appendChild(star);
+  }
+
+  const sky = document.getElementById('sky');
+  const switchBtn = document.getElementById('switchBtn');
+  const labels = document.querySelectorAll('.labels span');
+
+  function setMode(isNight) {
+    const mode = isNight ? 'night' : 'day';
+    sky.setAttribute('data-mode', mode);
+    switchBtn.setAttribute('aria-checked', String(isNight));
+    labels.forEach(el => el.classList.toggle('active', el.dataset.mode === mode));
+  }
+
+  switchBtn.addEventListener('click', () => {
+    const isNight = switchBtn.getAttribute('aria-checked') !== 'true';
+    setMode(isNight);
+  });
+</script>
+
+</body>
+</html>
