@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Image Drop Cards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..900;1,9..40,400..900&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  :root {
+    --bg-1: #f8f3e7;
+    --bg-2: #e9dec3;
+    --ink: #141416;
+    --mute: #8b847a;
+    --card-radius: 18px;
+    --orange-1: #d9351f;
+    --orange-2: #e85a2b;
+    --orange-3: #f58b4e;
+    --orange-4: #fdc68a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    background: radial-gradient(120% 70% at 50% 0%, var(--bg-1) 0%, var(--bg-2) 100%);
+    font-family: "DM Sans", system-ui, sans-serif;
+    color: var(--ink);
+  }
+
+  .stage {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+  }
+
+  /* ---------------------------------------------------
+     Card deck
+     Each card is positioned with CSS custom properties
+     rather than a bespoke class per card, so adding or
+     resizing a card never means editing three files.
+  --------------------------------------------------- */
+  .card-deck {
+    position: relative;
+    width: min(980px, 100%);
+    height: clamp(260px, 34vw, 340px);
+  }
+
+  .photo-card {
+    --w: 180px;
+    --h: 240px;
+    --x: 0%;
+    --y: 0;
+    --rot: 0deg;
+    --depth: 10;
+
+    position: absolute;
+    left: var(--x);
+    top: var(--y);
+    width: var(--w);
+    height: var(--h);
+    border-radius: var(--card-radius);
+    overflow: hidden;
+    cursor: pointer;
+    transform-style: preserve-3d;
+    background: linear-gradient(180deg, var(--orange-1) 0%, var(--orange-2) 35%, var(--orange-3) 70%, var(--orange-4) 100%);
+    box-shadow:
+      0 30px 50px -16px rgba(180, 50, 20, 0.5),
+      0 14px 26px -8px rgba(140, 40, 10, 0.32),
+      inset 0 2px 0 rgba(255, 220, 180, 0.45),
+      inset 0 -4px 8px rgba(120, 20, 0, 0.4);
+    will-change: transform;
+    transition: box-shadow 0.4s ease;
+  }
+
+  .photo-card:focus-visible {
+    outline: 3px solid var(--ink);
+    outline-offset: 4px;
+  }
+
+  .photo-card::before {
+    /* glass-like sheen, kept off the img so it never gets clipped by object-fit */
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    border-radius: inherit;
+    background: linear-gradient(
+      155deg,
+      rgba(255, 255, 255, 0.25) 0%,
+      transparent 30%,
+      transparent 70%,
+      rgba(100, 20, 0, 0.25) 100%
+    );
+  }
+
+  .photo-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center top;
+    display: block;
+  }
+
+  .photo-card:hover,
+  .photo-card:focus-visible {
+    box-shadow:
+      0 44px 70px -20px rgba(180, 50, 20, 0.6),
+      0 22px 38px -10px rgba(140, 40, 10, 0.38),
+      inset 0 2px 0 rgba(255, 220, 180, 0.5),
+      inset 0 -4px 8px rgba(120, 20, 0, 0.4);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .photo-card { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="card-deck" id="cardDeck">
+    <button class="photo-card" style="--w:130px;--h:180px;--x:4%; --y:30px;  --rot:-9deg; --depth:14;">
+      <img src="https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=400&h=600&fit=crop&crop=faces&q=80" alt="Team member portrait" loading="lazy" />
+    </button>
+    <button class="photo-card" style="--w:160px;--h:220px;--x:16%; --y:50px;  --rot:-5deg; --depth:10;">
+      <img src="https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&h=600&fit=crop&crop=faces&q=80" alt="Team member portrait" loading="lazy" />
+    </button>
+    <button class="photo-card" style="--w:200px;--h:270px;--x:30%; --y:20px;  --rot:-2deg; --depth:8;">
+      <img src="https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=400&h=600&fit=crop&crop=faces&q=80" alt="Team member portrait" loading="lazy" />
+    </button>
+    <button class="photo-card" style="--w:150px;--h:200px;--x:48%; --y:70px;  --rot:3deg;  --depth:12;">
+      <img src="https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400&h=600&fit=crop&crop=faces&q=80" alt="Team member portrait" loading="lazy" />
+    </button>
+    <button class="photo-card" style="--w:230px;--h:310px;--x:60%; --y:0px;   --rot:0deg;  --depth:6;">
+      <img src="https://images.unsplash.com/photo-1500917293891-ef795e70e1f6?w=400&h=600&fit=crop&crop=faces&q=80" alt="Team member portrait" loading="lazy" />
+    </button>
+    <button class="photo-card" style="--w:160px;--h:215px;--x:80%; --y:55px;  --rot:4deg;  --depth:11;">
+      <img src="https://images.unsplash.com/photo-1607346256330-dee7af15f7c5?w=400&h=600&fit=crop&crop=faces&q=80" alt="Team member portrait" loading="lazy" />
+    </button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+/**
+ * Photo card deck: drop-in entrance, idle float, cursor parallax
+ * and a 3D pointer-tilt on hover.
+ *
+ * Everything reads its rest rotation/depth straight from the
+ * CSS custom properties set in markup, so the animation logic
+ * never hard-codes per-card numbers.
+ */
+(() => {
+  const deck = document.getElementById("cardDeck");
+  const cards = Array.from(deck.querySelectorAll(".photo-card"));
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const cssNumber = (el, prop, fallback = 0) => {
+    const raw = getComputedStyle(el).getPropertyValue(prop);
+    const value = parseFloat(raw);
+    return Number.isNaN(value) ? fallback : value;
+  };
+
+  const cardState = cards.map((card) => ({
+    el: card,
+    restRotation: cssNumber(card, "--rot"),
+    depth: cssNumber(card, "--depth", 10)
+  }));
+
+  if (reduceMotion) {
+    gsap.set(cards, { rotation: (i) => cardState[i].restRotation, opacity: 1 });
+    return;
+  }
+
+  // ---- entrance ----
+  gsap.set(cards, { y: -400, rotation: (i) => cardState[i].restRotation + 25, opacity: 0, scale: 0.7 });
+
+  gsap.to(cards, {
+    y: 0,
+    opacity: 1,
+    scale: 1,
+    rotation: (i) => cardState[i].restRotation,
+    duration: 1.1,
+    stagger: { each: 0.08, from: "center" },
+    ease: "back.out(1.4)",
+    delay: 0.2
+  });
+
+  // ---- idle float, staggered per card so the deck doesn't breathe in unison ----
+  cardState.forEach(({ el, restRotation }, i) => {
+    gsap.to(el, {
+      y: `+=${8 + (i % 3) * 5}`,
+      rotation: restRotation + (i % 2 === 0 ? 1.5 : -1.5),
+      duration: 3 + (i % 4) * 0.5,
+      delay: 1.4 + i * 0.1,
+      ease: "sine.inOut",
+      yoyo: true,
+      repeat: -1
+    });
+  });
+
+  // ---- cursor parallax across the whole deck ----
+  let targetX = 0, targetY = 0;
+  let currentX = 0, currentY = 0;
+
+  deck.addEventListener("pointermove", (event) => {
+    const rect = deck.getBoundingClientRect();
+    targetX = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
+    targetY = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
+  });
+  deck.addEventListener("pointerleave", () => {
+    targetX = 0;
+    targetY = 0;
+  });
+
+  gsap.ticker.add(() => {
+    currentX += (targetX - currentX) * 0.08;
+    currentY += (targetY - currentY) * 0.08;
+    cardState.forEach(({ el, depth }) => {
+      el.style.translate = `${currentX * depth}px ${currentY * depth * 0.5}px`;
+    });
+  });
+
+  // ---- per-card 3D tilt on hover, restores to rest state on leave ----
+  cardState.forEach(({ el }) => {
+    el.addEventListener("pointermove", (event) => {
+      const rect = el.getBoundingClientRect();
+      const px = (event.clientX - rect.left) / rect.width - 0.5;
+      const py = (event.clientY - rect.top) / rect.height - 0.5;
+      gsap.to(el, {
+        rotateX: -py * 16,
+        rotateY: px * 16,
+        scale: 1.12,
+        zIndex: 20,
+        duration: 0.4,
+        ease: "power2.out",
+        transformPerspective: 700,
+        overwrite: "auto"
+      });
+    });
+
+    el.addEventListener("pointerleave", () => {
+      gsap.to(el, {
+        rotateX: 0,
+        rotateY: 0,
+        scale: 1,
+        zIndex: "auto",
+        duration: 0.8,
+        ease: "elastic.out(1, 0.6)",
+        overwrite: "auto"
+      });
+    });
+  });
+})();
+</script>
+</body>
+</html>
