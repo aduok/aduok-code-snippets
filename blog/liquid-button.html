@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Liquid Glass Button</title>
+<style>
+  :root{
+    --liquid-a: #4fb8f0;
+    --liquid-b: #1b7fd4;
+    --liquid-dark: #0a3f73;
+    --glass-tint: rgba(255,255,255,0.06);
+    --border-glow: rgba(255,255,255,0.55);
+  }
+
+  html, body{
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 30% 20%, #1c2530, #060a10 70%);
+    font-family: "Inter", system-ui, sans-serif;
+  }
+
+  .stage{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+  }
+
+  .liquid-btn{
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 34px 60px;
+    border-radius: 999px;
+    isolation: isolate;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    box-shadow:
+      0 1px 1px rgba(0,0,0,0.35),
+      0 8px 24px rgba(0,0,0,0.45),
+      0 20px 60px rgba(0,0,0,0.35);
+    transition: transform 120ms ease;
+  }
+  .liquid-btn:active{ transform: scale(0.965); }
+
+  .liquid-btn .frost{
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--glass-tint);
+    backdrop-filter: blur(22px) saturate(140%);
+    -webkit-backdrop-filter: blur(22px) saturate(140%);
+  }
+
+  .liquid-btn canvas{
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    border-radius: inherit;
+  }
+
+  .liquid-btn .rim{
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14);
+    background: linear-gradient(135deg, var(--border-glow), rgba(255,255,255,0) 30%, rgba(255,255,255,0) 70%, var(--border-glow));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    padding: 1px;
+    opacity: 0.5;
+  }
+
+  .liquid-btn .label{
+    position: relative;
+    z-index: 3;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: #eafffb;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+    pointer-events: none;
+  }
+
+  .caption{
+    color: rgba(255,255,255,0.35);
+    font-size: 13px;
+    letter-spacing: 0.02em;
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="liquid-btn" id="liquidBtn" data-fill="0.62">
+    <div class="frost"></div>
+    <canvas id="liquidCanvas"></canvas>
+    <div class="rim"></div>
+    <span class="label">WATER BUTTON</span>
+  </div>
+  <div class="caption">drag across the glass · click to slosh</div>
+</div>
+
+<script>
+/**
+ * FluidPane — a small mass-conserving 1D shallow-water solver rendered
+ * inside a rounded glass pane.
+ *
+ * The physical idea: split the pane into vertical lanes. Each lane holds
+ * a water height. Neighboring lanes exchange water through a flow value
+ * sitting on the boundary between them. Water accelerates toward lower
+ * neighboring lanes (gravity along the surface slope) and that flow moves
+ * volume from one lane into another — never creating or destroying it.
+ * That exchange is what makes the surface tip and slosh instead of just
+ * bobbing in place like a row of independent springs.
+ */
+class FluidPane {
+  constructor(canvas, host, opts = {}) {
+    this.canvas = canvas;
+    this.host = host;
+    this.ctx = canvas.getContext("2d");
+
+    this.lanes = opts.lanes ?? 56;
+    this.gravity = opts.gravity ?? 5400;
+    this.damping = opts.damping ?? 3.1;
+    this.fillLevel = opts.fill ?? 0.6;
+    this.colorTop = opts.colorTop ?? "#8FD8FF";
+    this.colorMid = opts.colorMid ?? "#2E8FE0";
+    this.colorDeep = opts.colorDeep ?? "#0A3F73";
+
+    this.height = new Float32Array(this.lanes);
+    this.flow = new Float32Array(this.lanes + 1);
+    this.restHeight = 0;
+    this.laneWidth = 1;
+
+    this.pointer = { x: -1e5, y: -1e5, dx: 0, dy: 0, down: false };
+    this.settled = true;
+    this.stillFrames = 0;
+
+    this.droplets = [];
+
+    this._bindEvents();
+    this._observeSize();
+    this._resize();
+    this._raf = requestAnimationFrame((t) => this._tick(t));
+  }
+
+  destroy() {
+    cancelAnimationFrame(this._raf);
+    this._ro.disconnect();
+    this.host.removeEventListener("pointerenter", this._onEnter);
+    this.host.removeEventListener("pointermove", this._onMove);
+    this.host.removeEventListener("pointerleave", this._onLeave);
+    this.host.removeEventListener("pointerdown", this._onDown);
+  }
+
+  // ---- setup -------------------------------------------------------
+
+  _observeSize() {
+    this._ro = new ResizeObserver(() => this._resize());
+    this._ro.observe(this.host);
+  }
+
+  _resize() {
+    const rect = this.host.getBoundingClientRect();
+    const dpr = Math.min(2.5, window.devicePixelRatio || 1);
+    this.width = Math.max(2, rect.width);
+    this.heightPx = Math.max(2, rect.height);
+    this.canvas.width = Math.round(this.width * dpr);
+    this.canvas.height = Math.round(this.heightPx * dpr);
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    this.laneWidth = this.width / this.lanes;
+    this.restHeight = this.heightPx * this.fillLevel;
+    this.height.fill(this.restHeight);
+    this.flow.fill(0);
+    this._draw();
+  }
+
+  _bindEvents() {
+    this._onEnter = (e) => this._updatePointer(e, true);
+    this._onMove = (e) => this._updatePointer(e, true);
+    this._onLeave = () => {
+      this.pointer.x = -1e5;
+      this.pointer.y = -1e5;
+      this.pointer.dx = 0;
+      this.pointer.dy = 0;
+      this._wake();
+    };
+    this._onDown = (e) => {
+      this._updatePointer(e, true);
+      this._splash(this.pointer.x, 320);
+    };
+    this.host.addEventListener("pointerenter", this._onEnter);
+    this.host.addEventListener("pointermove", this._onMove);
+    this.host.addEventListener("pointerleave", this._onLeave);
+    this.host.addEventListener("pointerdown", this._onDown);
+  }
+
+  _updatePointer(e, active) {
+    const rect = this.host.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    this.pointer.dx = x - (this.pointer.x === -1e5 ? x : this.pointer.x);
+    this.pointer.dy = y - (this.pointer.y === -1e5 ? y : this.pointer.y);
+    this.pointer.x = x;
+    this.pointer.y = y;
+    this.pointer.down = active;
+    this._wake();
+  }
+
+  _wake() {
+    this.settled = false;
+    this.stillFrames = 0;
+  }
+
+  // ---- physics -------------------------------------------------------
+
+  /** A local shove: nearby lanes get kicked away from the pointer's path. */
+  _stir(dt) {
+    const reach = 42;
+    const kick = Math.max(-10, Math.min(10, this.pointer.dx)) * 46;
+    const first = Math.max(1, Math.floor((this.pointer.x - reach) / this.laneWidth));
+    const last = Math.min(this.lanes - 1, Math.ceil((this.pointer.x + reach) / this.laneWidth));
+    for (let i = first; i <= last; i++) {
+      const dist = i * this.laneWidth - this.pointer.x;
+      const falloff = 1 - Math.abs(dist) / reach;
+      if (falloff <= 0) continue;
+      const surfaceY = this.heightPx - this.height[i];
+      if (this.pointer.y < surfaceY - reach) continue;
+      this.flow[i] += kick * falloff * dt;
+    }
+  }
+
+  /** An impulse at one point, e.g. from a click. */
+  _splash(x, strength) {
+    const reach = 46;
+    const first = Math.max(1, Math.floor((x - reach) / this.laneWidth));
+    const last = Math.min(this.lanes - 1, Math.ceil((x + reach) / this.laneWidth));
+    for (let i = first; i <= last; i++) {
+      const dist = i * this.laneWidth - x;
+      const falloff = 1 - Math.abs(dist) / reach;
+      if (falloff <= 0) continue;
+      this.flow[i] += Math.sign(dist || 1) * strength * falloff;
+    }
+  }
+
+  _advance(dt) {
+    const steps = 5;
+    const sub = dt / steps;
+    for (let s = 0; s < steps; s++) {
+      if (this.pointer.x > -1000) this._stir(sub);
+
+      // accelerate flow along the surface slope between neighboring lanes
+      for (let i = 1; i < this.lanes; i++) {
+        const slope = (this.height[i] - this.height[i - 1]) / this.laneWidth;
+        this.flow[i] += -this.gravity * slope * sub;
+        this.flow[i] *= Math.max(0, 1 - this.damping * sub);
+      }
+      this.flow[0] = 0;
+      this.flow[this.lanes] = 0;
+
+      // move volume between lanes according to flow (mass-conserving)
+      for (let i = 0; i < this.lanes; i++) {
+        const inflow = this.flow[i] * (this.flow[i] > 0 ? this.height[i - 1] ?? this.height[i] : this.height[i]);
+        const outflow = this.flow[i + 1] * (this.flow[i + 1] > 0 ? this.height[i] : this.height[i + 1] ?? this.height[i]);
+        this.height[i] -= ((outflow - inflow) / this.laneWidth) * sub;
+        if (this.height[i] < 0) this.height[i] = 0;
+      }
+    }
+  }
+
+  _advanceDroplets(dt) {
+    for (let i = this.droplets.length - 1; i >= 0; i--) {
+      const d = this.droplets[i];
+      d.vy += 1500 * dt;
+      d.x += d.vx * dt;
+      d.y += d.vy * dt;
+      const lane = Math.max(0, Math.min(this.lanes - 1, Math.floor(d.x / this.laneWidth)));
+      if (d.vy > 0 && d.y >= this.heightPx - this.height[lane]) {
+        this.height[lane] += 1.4;
+        this.droplets.splice(i, 1);
+      } else if (d.y > this.heightPx + 20) {
+        this.droplets.splice(i, 1);
+      }
+    }
+
+    // occasionally tear off a droplet where the surface is moving fastest
+    for (let i = 2; i < this.lanes - 2; i++) {
+      if (Math.abs(this.flow[i]) < 260) continue;
+      if (Math.random() > 0.06) continue;
+      if (this.droplets.length > 40) break;
+      this.droplets.push({
+        x: i * this.laneWidth,
+        y: this.heightPx - this.height[i] - 2,
+        vx: this.flow[i] * 0.06,
+        vy: -220 - Math.random() * 100,
+      });
+      this.height[i] = Math.max(0, this.height[i] - 1.2);
+    }
+  }
+
+  _measureRestlessness() {
+    let worst = 0;
+    for (let i = 0; i < this.lanes; i++) {
+      const off = Math.abs(this.height[i] - this.restHeight);
+      if (off > worst) worst = off;
+    }
+    return worst + this.droplets.length;
+  }
+
+  // ---- rendering -------------------------------------------------------
+
+  _draw() {
+    const ctx = this.ctx;
+    const w = this.width, h = this.heightPx;
+    ctx.clearRect(0, 0, w, h);
+
+    ctx.beginPath();
+    ctx.moveTo(0, h - this.height[0]);
+    for (let i = 0; i < this.lanes; i++) {
+      ctx.lineTo(i * this.laneWidth + this.laneWidth / 2, h - this.height[i]);
+    }
+    ctx.lineTo(w, h - this.height[this.lanes - 1]);
+    ctx.lineTo(w, h);
+    ctx.lineTo(0, h);
+    ctx.closePath();
+
+    ctx.fillStyle = this.colorMid;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(0, h - this.height[0]);
+    for (let i = 0; i < this.lanes; i++) {
+      ctx.lineTo(i * this.laneWidth + this.laneWidth / 2, h - this.height[i]);
+    }
+    ctx.strokeStyle = "rgba(255,255,255,0.65)";
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+
+    if (this.droplets.length) {
+      ctx.fillStyle = this.colorTop;
+      ctx.beginPath();
+      for (const d of this.droplets) {
+        ctx.moveTo(d.x + 1.6, d.y);
+        ctx.arc(d.x, d.y, 1.6, 0, Math.PI * 2);
+      }
+      ctx.fill();
+    }
+  }
+
+  // ---- loop -------------------------------------------------------
+
+  _tick(now) {
+    if (!this._last) this._last = now;
+    const dt = Math.min((now - this._last) / 1000, 1 / 30);
+    this._last = now;
+
+    if (!this.settled) {
+      this._advance(dt);
+      this._advanceDroplets(dt);
+      this._draw();
+
+      const restless = this._measureRestlessness();
+      if (restless < 0.06 && this.pointer.x < -1000) {
+        this.stillFrames++;
+      } else {
+        this.stillFrames = 0;
+      }
+      if (this.stillFrames > 24) {
+        this.height.fill(this.restHeight);
+        this.flow.fill(0);
+        this.droplets.length = 0;
+        this.settled = true;
+        this._draw();
+      }
+    }
+
+    this._raf = requestAnimationFrame((t) => this._tick(t));
+  }
+}
+
+const host = document.getElementById("liquidBtn");
+const canvas = document.getElementById("liquidCanvas");
+new FluidPane(canvas, host, { fill: parseFloat(host.dataset.fill) });
+</script>
+</body>
+</html>
