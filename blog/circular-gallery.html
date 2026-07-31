@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Circular specimen gallery</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  @property --rotation {
+    syntax: "<angle>";
+    inherits: true;
+    initial-value: 0deg;
+  }
+
+  :root{
+    --bg: #14120f;
+    --bg-inset: #1b1814;
+    --bone: #e9e0cf;
+    --rust: #b9682f;
+    --moss: #4c6a58;
+    --line: rgba(233, 224, 207, .18);
+    --line-strong: rgba(233, 224, 207, .55);
+
+    --ring-radius: 38vmin;
+    --card-width: clamp(38px, 6.6vw, 108px);
+    --card-radius: .6vw;
+    --count: 20;
+
+    --arc-span: .94;
+    --arc-center: .275;
+    --arc-start: calc(var(--arc-center) - var(--arc-span) / 2);
+    --arc-step: calc(var(--arc-span) / (var(--count) - 1));
+    --shift-unit: .0075;
+
+    --card-duration: 900ms;
+    --card-easing: cubic-bezier(.22, 1, .36, 1);
+
+    color-scheme: dark;
+  }
+
+  *, *::before, *::after{ box-sizing: border-box; }
+
+  body{
+    margin: 0;
+    min-height: 100svh;
+    background:
+      radial-gradient(120vmax 80vmax at 50% 110%, var(--bg-inset), transparent 60%),
+      var(--bg);
+    color: var(--bone);
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+  }
+
+  /* ---------- the ring itself ---------- */
+  .ring{
+    anchor-name: --ring-center;
+    position: relative;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    width: var(--ring-radius);
+    aspect-ratio: 1;
+    transform: rotate(var(--rotation));
+    transition: transform var(--card-duration) var(--card-easing);
+  }
+
+  .ring li{
+    --card-i: var(--i);
+    --shift: calc(var(--shift-unit) * var(--d, 1));
+    --offset-distance: calc(
+      (var(--arc-start) + (var(--card-i) - 1) * var(--arc-step) + var(--shift)) * 100%
+    );
+  }
+
+  .ring li:has(a:hover),
+  .ring li:target{
+    --title-opacity: 1;
+  }
+  .ring li:target{
+    --z: 3;
+    --center-opacity: 1;
+    --center-scale: 1;
+    --plate-outline: var(--line-strong);
+  }
+
+  /* enlarged image shown at the ring's center, sourced from the hovered/targeted li's --img */
+  .ring li::before{
+    content: "";
+    position: fixed;
+    position-anchor: --ring-center;
+    position-area: span-all;
+    transform: rotate(calc(var(--rotation) * -1));
+    width: var(--ring-radius);
+    aspect-ratio: 1;
+    border-radius: 9999px;
+    box-sizing: border-box;
+    outline: 8px solid var(--plate-outline, transparent);
+    outline-offset: -8px;
+    background-image: var(--img);
+    background-size: cover;
+    background-position: center;
+    opacity: var(--center-opacity, 0);
+    scale: var(--center-scale, .85);
+    pointer-events: none;
+    transition: opacity 200ms ease, scale var(--card-duration) var(--card-easing);
+  }
+
+  /* label shown over the enlarged image: just the specimen's two-word name */
+  .ring li::after{
+    content: attr(data-title);
+    position: fixed;
+    position-anchor: --card-anchor;
+    position-area: center span-all;
+    z-index: 4;
+    max-width: 20ch;
+    text-align: center;
+    font-size: .58rem;
+    letter-spacing: .01em;
+    line-height: 1.4;
+    color: var(--bone);
+    background: rgb(20 18 15 / .55);
+    border: 1px solid var(--line-strong);
+    backdrop-filter: blur(4px);
+    padding: .4em .8em;
+    border-radius: 4px;
+    opacity: var(--title-opacity, 0);
+    pointer-events: none;
+    transition: opacity 180ms ease;
+    @starting-style{ opacity: 0; }
+  }
+
+  .ring a{
+    anchor-name: --card-anchor;
+    position: absolute;
+    display: block;
+    width: var(--card-width);
+    aspect-ratio: 5 / 7;
+    border-radius: var(--card-radius);
+    border: 2px solid var(--bg);
+    offset-path: circle(var(--ring-radius) at 50% 50%);
+    offset-distance: var(--offset-distance);
+    offset-rotate: auto;
+    offset-anchor: 50% 0%;
+    transition: offset var(--card-duration) var(--card-easing);
+    z-index: var(--z, 1);
+  }
+  .ring a:focus-visible{
+    outline: 2px solid var(--rust);
+    outline-offset: 2px;
+  }
+
+  /* dummy thumbnail image for each card */
+  .ring a img{
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: inherit;
+  }
+  .ring a .catalog{
+    position: absolute;
+    inset: auto 0 4px 0;
+    text-align: center;
+    font-size: .55rem;
+    letter-spacing: .08em;
+    color: rgb(255 255 255 / .85);
+    text-shadow: 0 1px 2px rgb(0 0 0 / .6);
+  }
+
+  /* ---------- forward (clockwise) neighbour shift ---------- */
+  .ring:has(> li:hover) > li:hover + li,
+  .ring:has(> li:last-child:hover) > li:nth-child(1){ --d: 3; }
+
+  .ring:has(> li:hover) > li:hover + li + li,
+  .ring:has(> li:last-child:hover) > li:nth-child(2),
+  .ring:has(> li:nth-last-child(2):hover) > li:nth-child(1){ --d: 2; }
+
+  .ring:has(> li:hover) > li:hover + li + li + li,
+  .ring:has(> li:last-child:hover) > li:nth-child(3),
+  .ring:has(> li:nth-last-child(2):hover) > li:nth-child(2),
+  .ring:has(> li:nth-last-child(3):hover) > li:nth-child(1){ --d: 1; }
+
+  .ring:has(> li:hover) > li:hover + li + li + li + li,
+  .ring:has(> li:last-child:hover) > li:nth-child(4),
+  .ring:has(> li:nth-last-child(2):hover) > li:nth-child(3),
+  .ring:has(> li:nth-last-child(3):hover) > li:nth-child(2),
+  .ring:has(> li:nth-last-child(4):hover) > li:nth-child(1){ --d: .5; }
+
+  /* ---------- backward (counter-clockwise) neighbour shift ---------- */
+  .ring li:has(+ li:hover),
+  .ring:has(> li:nth-child(1):hover) > li:nth-last-child(1){ --d: -3; }
+
+  .ring li:has(+ li + li:hover),
+  .ring:has(> li:nth-child(1):hover) > li:nth-last-child(2),
+  .ring:has(> li:nth-child(2):hover) > li:nth-last-child(1){ --d: -2; }
+
+  .ring li:has(+ li + li + li:hover),
+  .ring:has(> li:nth-child(1):hover) > li:nth-last-child(3),
+  .ring:has(> li:nth-child(2):hover) > li:nth-last-child(2),
+  .ring:has(> li:nth-child(3):hover) > li:nth-last-child(1){ --d: -1; }
+
+  .ring li:has(+ li + li + li + li:hover),
+  .ring:has(> li:nth-child(1):hover) > li:nth-last-child(4),
+  .ring:has(> li:nth-child(2):hover) > li:nth-last-child(3),
+  .ring:has(> li:nth-child(3):hover) > li:nth-last-child(2),
+  .ring:has(> li:nth-child(4):hover) > li:nth-last-child(1){ --d: -.5; }
+
+  /* ---------- controls ---------- */
+  .controls{
+    position: fixed;
+    left: 50%;
+    bottom: 1.5rem;
+    translate: -50% 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    font-size: .68rem;
+    letter-spacing: .04em;
+    color: rgb(233 224 207 / .8);
+  }
+  .controls input[type="range"]{
+    accent-color: var(--rust);
+    width: clamp(120px, 22vw, 220px);
+  }
+
+  .btn-close{
+    position: fixed;
+    top: 1.25rem;
+    right: 1.5rem;
+    z-index: 5;
+    color: var(--bone);
+    text-decoration: none;
+    font-size: .7rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    border: 1px solid var(--line);
+    padding: .4em .9em;
+    border-radius: 3px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 150ms ease;
+  }
+  .ring:has(li:target) ~ .btn-close{
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .btn-close:hover{ border-color: var(--line-strong); }
+
+  @media (prefers-reduced-motion: reduce){
+    .ring, .ring a, .ring li::before, .ring li::after{
+      transition-duration: 1ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<ul class="ring" aria-label="Twenty cataloged specimens, arranged in a circle">
+    <!-- Each <li> is one specimen. --i sets its position on the ring; --img is a dummy
+         placeholder photo (picsum.photos, seeded per specimen so it's stable on reload). -->
+    <li style="--i:1;  --img:url('https://picsum.photos/seed/amber-nautilus/400/560')"  id="specimen-01" data-title="Amber Nautilus"><a href="#specimen-01" aria-label="Amber Nautilus, specimen 01"><img src="https://picsum.photos/seed/amber-nautilus/200/280" alt="" loading="lazy"><span class="catalog">No. 01</span></a></li>
+    <li style="--i:2;  --img:url('https://picsum.photos/seed/verdigris-bloom/400/560')"  id="specimen-02" data-title="Verdigris Bloom"><a href="#specimen-02" aria-label="Verdigris Bloom, specimen 02"><img src="https://picsum.photos/seed/verdigris-bloom/200/280" alt="" loading="lazy"><span class="catalog">No. 02</span></a></li>
+    <li style="--i:3;  --img:url('https://picsum.photos/seed/cinder-bract/400/560')"  id="specimen-03" data-title="Cinder Bract"><a href="#specimen-03" aria-label="Cinder Bract, specimen 03"><img src="https://picsum.photos/seed/cinder-bract/200/280" alt="" loading="lazy"><span class="catalog">No. 03</span></a></li>
+    <li style="--i:4;  --img:url('https://picsum.photos/seed/slate-tideline/400/560')"  id="specimen-04" data-title="Slate Tideline"><a href="#specimen-04" aria-label="Slate Tideline, specimen 04"><img src="https://picsum.photos/seed/slate-tideline/200/280" alt="" loading="lazy"><span class="catalog">No. 04</span></a></li>
+    <li style="--i:5;  --img:url('https://picsum.photos/seed/honeycomb-geode/400/560')"  id="specimen-05" data-title="Honeycomb Geode"><a href="#specimen-05" aria-label="Honeycomb Geode, specimen 05"><img src="https://picsum.photos/seed/honeycomb-geode/200/280" alt="" loading="lazy"><span class="catalog">No. 05</span></a></li>
+    <li style="--i:6;  --img:url('https://picsum.photos/seed/moss-agate-leaf/400/560')"  id="specimen-06" data-title="Moss Agate Leaf"><a href="#specimen-06" aria-label="Moss Agate Leaf, specimen 06"><img src="https://picsum.photos/seed/moss-agate-leaf/200/280" alt="" loading="lazy"><span class="catalog">No. 06</span></a></li>
+    <li style="--i:7;  --img:url('https://picsum.photos/seed/ember-coral/400/560')"  id="specimen-07" data-title="Ember Coral"><a href="#specimen-07" aria-label="Ember Coral, specimen 07"><img src="https://picsum.photos/seed/ember-coral/200/280" alt="" loading="lazy"><span class="catalog">No. 07</span></a></li>
+    <li style="--i:8;  --img:url('https://picsum.photos/seed/frost-fern/400/560')"  id="specimen-08" data-title="Frost Fern"><a href="#specimen-08" aria-label="Frost Fern, specimen 08"><img src="https://picsum.photos/seed/frost-fern/200/280" alt="" loading="lazy"><span class="catalog">No. 08</span></a></li>
+    <li style="--i:9;  --img:url('https://picsum.photos/seed/ochre-shellwork/400/560')"  id="specimen-09" data-title="Ochre Shellwork"><a href="#specimen-09" aria-label="Ochre Shellwork, specimen 09"><img src="https://picsum.photos/seed/ochre-shellwork/200/280" alt="" loading="lazy"><span class="catalog">No. 09</span></a></li>
+    <li style="--i:10; --img:url('https://picsum.photos/seed/indigo-drupe/400/560')" id="specimen-10" data-title="Indigo Drupe"><a href="#specimen-10" aria-label="Indigo Drupe, specimen 10"><img src="https://picsum.photos/seed/indigo-drupe/200/280" alt="" loading="lazy"><span class="catalog">No. 10</span></a></li>
+    <li style="--i:11; --img:url('https://picsum.photos/seed/rust-cicada-wing/400/560')" id="specimen-11" data-title="Rust Cicada Wing"><a href="#specimen-11" aria-label="Rust Cicada Wing, specimen 11"><img src="https://picsum.photos/seed/rust-cicada-wing/200/280" alt="" loading="lazy"><span class="catalog">No. 11</span></a></li>
+    <li style="--i:12; --img:url('https://picsum.photos/seed/pyrite-cluster/400/560')" id="specimen-12" data-title="Pyrite Cluster"><a href="#specimen-12" aria-label="Pyrite Cluster, specimen 12"><img src="https://picsum.photos/seed/pyrite-cluster/200/280" alt="" loading="lazy"><span class="catalog">No. 12</span></a></li>
+    <li style="--i:13; --img:url('https://picsum.photos/seed/chalk-antler/400/560')" id="specimen-13" data-title="Chalk Antler"><a href="#specimen-13" aria-label="Chalk Antler, specimen 13"><img src="https://picsum.photos/seed/chalk-antler/200/280" alt="" loading="lazy"><span class="catalog">No. 13</span></a></li>
+    <li style="--i:14; --img:url('https://picsum.photos/seed/copper-vine/400/560')" id="specimen-14" data-title="Copper Vine"><a href="#specimen-14" aria-label="Copper Vine, specimen 14"><img src="https://picsum.photos/seed/copper-vine/200/280" alt="" loading="lazy"><span class="catalog">No. 14</span></a></li>
+    <li style="--i:15; --img:url('https://picsum.photos/seed/sable-urchin/400/560')" id="specimen-15" data-title="Sable Urchin"><a href="#specimen-15" aria-label="Sable Urchin, specimen 15"><img src="https://picsum.photos/seed/sable-urchin/200/280" alt="" loading="lazy"><span class="catalog">No. 15</span></a></li>
+    <li style="--i:16; --img:url('https://picsum.photos/seed/sienna-cocoon/400/560')" id="specimen-16" data-title="Sienna Cocoon"><a href="#specimen-16" aria-label="Sienna Cocoon, specimen 16"><img src="https://picsum.photos/seed/sienna-cocoon/200/280" alt="" loading="lazy"><span class="catalog">No. 16</span></a></li>
+    <li style="--i:17; --img:url('https://picsum.photos/seed/jade-root-knot/400/560')" id="specimen-17" data-title="Jade Root Knot"><a href="#specimen-17" aria-label="Jade Root Knot, specimen 17"><img src="https://picsum.photos/seed/jade-root-knot/200/280" alt="" loading="lazy"><span class="catalog">No. 17</span></a></li>
+    <li style="--i:18; --img:url('https://picsum.photos/seed/bronze-locust/400/560')" id="specimen-18" data-title="Bronze Locust"><a href="#specimen-18" aria-label="Bronze Locust, specimen 18"><img src="https://picsum.photos/seed/bronze-locust/200/280" alt="" loading="lazy"><span class="catalog">No. 18</span></a></li>
+    <li style="--i:19; --img:url('https://picsum.photos/seed/clay-wing-print/400/560')" id="specimen-19" data-title="Clay Wing Print"><a href="#specimen-19" aria-label="Clay Wing Print, specimen 19"><img src="https://picsum.photos/seed/clay-wing-print/200/280" alt="" loading="lazy"><span class="catalog">No. 19</span></a></li>
+    <li style="--i:20; --img:url('https://picsum.photos/seed/opal-husk/400/560')" id="specimen-20" data-title="Opal Husk"><a href="#specimen-20" aria-label="Opal Husk, specimen 20"><img src="https://picsum.photos/seed/opal-husk/200/280" alt="" loading="lazy"><span class="catalog">No. 20</span></a></li>
+  </ul>
+
+  <a href="#" class="btn-close">Close ✕</a>
+
+  <div class="controls">
+    <label for="rotate">Rotate</label>
+    <input type="range" id="rotate" min="0" max="360" value="0" step="1">
+  </div>
+
+  <script>
+    const ring = document.querySelector('.ring');
+    const rotate = document.getElementById('rotate');
+    rotate.addEventListener('input', (event) => {
+      ring.style.setProperty('--rotation', `${event.target.value}deg`);
+    });
+  </script>
+
+</body>
+</html>
