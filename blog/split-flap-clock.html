@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Split-Flap Clock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0c0d0f;
+    --board: #17181b;
+    --card-top-a: #2d2e33;
+    --card-top-b: #212226;
+    --card-bot-a: #191a1d;
+    --card-bot-b: #101113;
+    --amber: #ffb238;
+    --amber-glow: rgba(255,178,56,.35);
+    --rivet: #060607;
+    --pulse: #e5484d;
+
+    --w: 78px;
+    --h: 112px;
+    --gap: 6px;
+    --font-digit: 'Oswald', sans-serif;
+    --font-ui: 'JetBrains Mono', monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+  }
+
+  body{
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    background:
+      radial-gradient(ellipse at 50% 35%, rgba(255,178,56,.06), transparent 60%),
+      var(--bg);
+    font-family: var(--font-ui);
+    color: #9a9ba1;
+    overflow-x: hidden;
+  }
+
+  .rig{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 22px;
+    padding: 40px 20px;
+  }
+
+  .eyebrow{
+    letter-spacing: .35em;
+    font-size: 11px;
+    font-weight: 600;
+    color: #565860;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .eyebrow .dot{
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--pulse);
+    box-shadow: 0 0 8px 1px var(--pulse);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse{
+    0%, 100% { opacity: 1; }
+    50% { opacity: .25; }
+  }
+
+  .board{
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 26px 32px;
+    background: linear-gradient(180deg, #1c1d20, #131417);
+    border-radius: 18px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,.04) inset,
+      0 30px 60px -20px rgba(0,0,0,.7),
+      0 0 0 1px #000;
+  }
+
+  .board::before{
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 18px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+    pointer-events: none;
+    mix-blend-mode: overlay;
+  }
+
+  .rivet{
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #3a3b40, var(--rivet));
+    box-shadow: 0 1px 0 rgba(255,255,255,.06);
+  }
+  .rivet.tl{ top: 10px; left: 10px; }
+  .rivet.tr{ top: 10px; right: 10px; }
+  .rivet.bl{ bottom: 10px; left: 10px; }
+  .rivet.br{ bottom: 10px; right: 10px; }
+
+  .unit{
+    display: flex;
+    gap: var(--gap);
+  }
+
+  .colon{
+    font-family: var(--font-digit);
+    font-size: 40px;
+    font-weight: 700;
+    color: #3d3e43;
+    align-self: center;
+    user-select: none;
+  }
+
+  .flip{
+    position: relative;
+    width: var(--w);
+    height: var(--h);
+    perspective: 260px;
+    font-family: var(--font-digit);
+    font-weight: 700;
+    font-size: calc(var(--h) * 0.72);
+    color: var(--amber);
+    text-shadow: 0 0 18px var(--amber-glow);
+  }
+
+  .half{
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 50%;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    border-radius: 10px;
+  }
+
+  .glyph{
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: var(--h);
+    line-height: var(--h);
+    text-align: center;
+  }
+
+  .top{
+    top: 0;
+    background: linear-gradient(180deg, var(--card-top-a), var(--card-top-b));
+    box-shadow: 0 1px 0 rgba(255,255,255,.05) inset, 0 1px 2px rgba(0,0,0,.6);
+    border-radius: 10px 10px 0 0;
+  }
+  .top .glyph{ top: 0; }
+
+  .bottom{
+    bottom: 0;
+    background: linear-gradient(180deg, var(--card-bot-a), var(--card-bot-b));
+    box-shadow: 0 -1px 0 rgba(0,0,0,.5) inset;
+    border-radius: 0 0 10px 10px;
+  }
+  .bottom .glyph{ top: calc(var(--h) * -0.5); }
+
+  .leaf{
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 50%;
+    transform-style: preserve-3d;
+    transform-origin: bottom center;
+    transform: rotateX(0deg);
+    border-radius: 10px 10px 0 0;
+  }
+
+  .leaf.turning{
+    transition: transform .42s cubic-bezier(.6, .04, .4, 1);
+    transform: rotateX(-180deg);
+  }
+
+  .leaf-face{
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    backface-visibility: hidden;
+    border-radius: 10px 10px 0 0;
+    background: linear-gradient(180deg, var(--card-top-a), var(--card-top-b));
+    box-shadow: 0 1px 0 rgba(255,255,255,.05) inset;
+  }
+
+  .leaf-face.back{
+    transform: rotateX(180deg);
+  }
+
+  .leaf-face .glyph{ top: 0; }
+
+  .divider{
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 1px;
+    background: rgba(0,0,0,.55);
+    box-shadow: 0 1px 0 rgba(255,255,255,.04);
+    z-index: 3;
+    pointer-events: none;
+  }
+
+  .caption{
+    letter-spacing: .3em;
+    font-size: 10px;
+    font-weight: 400;
+    color: #4c4d53;
+    text-align: center;
+    margin-top: 10px;
+  }
+
+  .date{
+    font-size: 12px;
+    letter-spacing: .12em;
+    color: #6a6b72;
+  }
+
+  .sr-only{
+    position: absolute;
+    width: 1px; height: 1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    white-space: nowrap;
+  }
+
+  @media (max-width: 560px){
+    :root{ --w: 50px; --h: 76px; --gap: 4px; }
+    .board{ padding: 18px 16px; gap: 10px; }
+    .colon{ font-size: 26px; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .leaf.turning{ transition: none; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="rig">
+    <div class="eyebrow"><span class="dot"></span> LIVE</div>
+
+    <div class="board" id="board" aria-hidden="true">
+      <span class="rivet tl"></span><span class="rivet tr"></span>
+      <span class="rivet bl"></span><span class="rivet br"></span>
+
+      <div class="unit" data-unit="hours"></div>
+      <div class="colon">:</div>
+      <div class="unit" data-unit="minutes"></div>
+      <div class="colon">:</div>
+      <div class="unit" data-unit="seconds"></div>
+    </div>
+
+    <div class="caption">HOURS &nbsp;·&nbsp; MINUTES &nbsp;·&nbsp; SECONDS</div>
+    <div class="date" id="date"></div>
+    <p class="sr-only" id="sr-time" aria-live="off"></p>
+  </div>
+
+<script>
+(function () {
+  const FLIP_MS = 420;
+
+  function buildDigit() {
+    const flip = document.createElement('div');
+    flip.className = 'flip';
+    flip.innerHTML = `
+      <div class="half top"><div class="glyph">0</div></div>
+      <div class="half bottom"><div class="glyph">0</div></div>
+      <div class="leaf">
+        <div class="leaf-face front"><div class="glyph">0</div></div>
+        <div class="leaf-face back"><div class="glyph">0</div></div>
+      </div>
+      <div class="divider"></div>
+    `;
+    return {
+      el: flip,
+      top: flip.querySelector('.top .glyph'),
+      bottom: flip.querySelector('.bottom .glyph'),
+      leaf: flip.querySelector('.leaf'),
+      front: flip.querySelector('.leaf-face.front .glyph'),
+      back: flip.querySelector('.leaf-face.back .glyph'),
+      current: '0'
+    };
+  }
+
+  function setDigit(d, value) {
+    if (value === d.current) return;
+
+    d.front.textContent = d.current;
+    d.back.textContent = value;
+
+    // force reflow so the transition reliably triggers
+    d.leaf.classList.remove('turning');
+    void d.leaf.offsetWidth;
+    d.leaf.classList.add('turning');
+
+    window.setTimeout(() => {
+      d.bottom.textContent = value;
+    }, FLIP_MS / 2);
+
+    window.setTimeout(() => {
+      d.leaf.classList.remove('turning');
+      d.top.textContent = value;
+      d.front.textContent = value;
+      d.back.textContent = value;
+      d.current = value;
+    }, FLIP_MS);
+  }
+
+  const units = {};
+  document.querySelectorAll('.unit').forEach((node) => {
+    const name = node.dataset.unit;
+    const digits = [buildDigit(), buildDigit()];
+    digits.forEach((d) => node.appendChild(d.el));
+    units[name] = digits;
+  });
+
+  const dateEl = document.getElementById('date');
+  const srEl = document.getElementById('sr-time');
+  const dateFmt = new Intl.DateTimeFormat(undefined, {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+  });
+
+  let lastDateString = '';
+
+  function tick() {
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+
+    setDigit(units.hours[0], hh[0]);
+    setDigit(units.hours[1], hh[1]);
+    setDigit(units.minutes[0], mm[0]);
+    setDigit(units.minutes[1], mm[1]);
+    setDigit(units.seconds[0], ss[0]);
+    setDigit(units.seconds[1], ss[1]);
+
+    const dateString = dateFmt.format(now);
+    if (dateString !== lastDateString) {
+      dateEl.textContent = dateString;
+      srEl.textContent = `${dateString}, ${hh}:${mm}:${ss}`;
+      lastDateString = dateString;
+    }
+  }
+
+  tick();
+  setInterval(tick, 1000);
+})();
+</script>
+
+</body>
+</html>
