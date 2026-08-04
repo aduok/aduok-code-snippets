@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Glass Card</title>
+<style>
+  /* ============================================================
+     Design tokens
+     ============================================================ */
+  :root {
+    --page-bg: #051220;
+    --card-gradient: linear-gradient(140deg, #7dd3fc 0%, #38bdf8 40%, #1d4ed8 100%);
+    --glass-top: rgba(255, 255, 255, 0.36);
+    --glass-bottom: rgba(255, 255, 255, 0.82);
+    --glass-edge: rgba(255, 255, 255, 0.84);
+    --orbit-fill: rgba(191, 232, 255, 0.34);
+    --icon-fill: #1e40af;
+    --title-color: #1e3a8a;
+    --body-color: rgba(30, 58, 138, 0.85);
+    --cta-color: #2563eb;
+    --focus-ring: #93c5fd;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    display: grid;
+    place-items: center;
+    min-height: 100vh;
+    padding: 3rem 1.5rem;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background:
+      radial-gradient(ellipse 80% 60% at 80% 0%, rgba(56, 189, 248, 0.16), transparent 55%),
+      radial-gradient(ellipse 60% 45% at 10% 100%, rgba(29, 78, 216, 0.14), transparent 50%),
+      var(--page-bg);
+  }
+
+  /* ============================================================
+     Card shell — perspective wrapper drives the 3D tilt
+     ============================================================ */
+  .orb-card {
+    width: min(100%, 340px);
+    height: 300px;
+    perspective: 1000px;
+    filter: drop-shadow(0 28px 50px rgba(8, 20, 40, 0.5));
+  }
+
+  .orb-card__surface {
+    position: relative;
+    height: 100%;
+    border-radius: 50px;
+    background: var(--card-gradient);
+    transform-style: preserve-3d;
+    transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.55s ease;
+    box-shadow: rgba(15, 40, 90, 0.32) 0 25px 25px -5px;
+  }
+
+  .orb-card:hover .orb-card__surface,
+  .orb-card:focus-within .orb-card__surface {
+    transform: rotate3d(1, 1, 0, 28deg);
+    box-shadow: rgba(15, 40, 90, 0.5) 28px 48px 28px -38px,
+      rgba(147, 197, 253, 0.22) 0 0 60px -10px, rgba(15, 40, 90, 0.18) 0 25px 35px 0;
+  }
+
+  /* Frosted glass panel, raised above the surface on the z-axis */
+  .orb-card__glass {
+    position: absolute;
+    inset: 8px;
+    border-radius: 55px;
+    border-top-right-radius: 100%;
+    background: linear-gradient(0deg, var(--glass-top) 0%, var(--glass-bottom) 100%);
+    border-inline-start: 1px solid var(--glass-edge);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.7);
+    transform: translate3d(0, 0, 25px);
+    pointer-events: none;
+  }
+
+  /* ============================================================
+     Orbiting rings — decorative, staggered on the z-axis
+     ============================================================ */
+  .orb-card__rings {
+    position: absolute;
+    inset-inline-end: 0;
+    top: 0;
+    transform-style: preserve-3d;
+    pointer-events: none;
+  }
+
+  .orb-card__ring {
+    position: absolute;
+    top: 0;
+    inset-inline-end: 0;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: var(--orbit-fill);
+    box-shadow: rgba(30, 64, 175, 0.3) -10px 10px 24px 0;
+    backdrop-filter: blur(6px);
+    transition: transform 0.5s ease-in-out;
+  }
+
+  .orb-card__ring:nth-child(1) { width: 170px; top: 8px; inset-inline-end: 8px; transform: translate3d(0, 0, 20px); }
+  .orb-card__ring:nth-child(2) { width: 140px; top: 10px; inset-inline-end: 10px; transform: translate3d(0, 0, 40px); transition-delay: 0.05s; }
+  .orb-card__ring:nth-child(3) { width: 110px; top: 17px; inset-inline-end: 17px; transform: translate3d(0, 0, 60px); transition-delay: 0.1s; }
+  .orb-card__ring:nth-child(4) { width: 80px;  top: 23px; inset-inline-end: 23px; transform: translate3d(0, 0, 80px); transition-delay: 0.15s; }
+  .orb-card__ring:nth-child(5) {
+    width: 50px;
+    top: 30px;
+    inset-inline-end: 30px;
+    display: grid;
+    place-content: center;
+    transform: translate3d(0, 0, 100px);
+    transition-delay: 0.2s;
+  }
+  .orb-card__ring:nth-child(5) svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: #fff;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .orb-card:hover .orb-card__ring:nth-child(2),
+  .orb-card:focus-within .orb-card__ring:nth-child(2) { transform: translate3d(0, 0, 60px); }
+  .orb-card:hover .orb-card__ring:nth-child(3),
+  .orb-card:focus-within .orb-card__ring:nth-child(3) { transform: translate3d(0, 0, 80px); }
+  .orb-card:hover .orb-card__ring:nth-child(4),
+  .orb-card:focus-within .orb-card__ring:nth-child(4) { transform: translate3d(0, 0, 100px); }
+  .orb-card:hover .orb-card__ring:nth-child(5),
+  .orb-card:focus-within .orb-card__ring:nth-child(5) { transform: translate3d(0, 0, 120px); }
+
+  /* ============================================================
+     Content
+     ============================================================ */
+  .orb-card__content {
+    position: relative;
+    z-index: 3;
+    padding: 100px 3.75rem 0 1.85rem;
+    transform: translate3d(0, 0, 26px);
+  }
+
+  .orb-card__title {
+    display: block;
+    font-weight: 800;
+    font-size: 1.25rem;
+    letter-spacing: -0.02em;
+    color: var(--title-color);
+  }
+
+  .orb-card__text {
+    display: block;
+    margin-top: 1.05rem;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    font-weight: 600;
+    color: var(--body-color);
+  }
+
+  /* ============================================================
+     Footer row — actions and link-out
+     ============================================================ */
+  .orb-card__footer {
+    position: absolute;
+    z-index: 4;
+    bottom: 20px;
+    left: 20px;
+    right: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transform: translate3d(0, 0, 26px);
+  }
+
+  .orb-card__actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  .orb-card__action {
+    width: 32px;
+    aspect-ratio: 1;
+    padding: 6px;
+    display: grid;
+    place-content: center;
+    border: none;
+    border-radius: 50%;
+    background: #fff;
+    cursor: pointer;
+    box-shadow: rgba(15, 40, 90, 0.45) 0 8px 6px -5px;
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, background 0.2s;
+  }
+
+  .orb-card__action svg {
+    width: 15px;
+    height: 15px;
+    fill: none;
+    stroke: var(--icon-fill);
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .orb-card__action:hover,
+  .orb-card__action:focus-visible {
+    background: #0c2a52;
+  }
+  .orb-card__action:hover svg,
+  .orb-card__action:focus-visible svg {
+    stroke: #fff;
+  }
+
+  .orb-card:hover .orb-card__action,
+  .orb-card:focus-within .orb-card__action {
+    transform: translate3d(0, 0, 50px);
+    box-shadow: rgba(15, 40, 90, 0.25) -5px 20px 12px 0;
+  }
+
+  .orb-card__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    color: var(--cta-color);
+    font-weight: 800;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+  }
+
+  .orb-card__link:hover,
+  .orb-card__link:focus-visible {
+    transform: translate3d(0, 0, 10px);
+  }
+
+  .orb-card__link svg {
+    width: 18px;
+    height: 15px;
+    fill: none;
+    stroke: var(--cta-color);
+    stroke-width: 3px;
+  }
+
+  /* Keyboard accessibility */
+  a:focus-visible,
+  button:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  /* Respect reduced-motion preference */
+  @media (prefers-reduced-motion: reduce) {
+    .orb-card__surface,
+    .orb-card__ring,
+    .orb-card__action,
+    .orb-card__link {
+      transition: none !important;
+    }
+    .orb-card:hover .orb-card__surface,
+    .orb-card:focus-within .orb-card__surface {
+      transform: none;
+    }
+  }
+</style>
+</head>
+<body>
+
+  <article class="orb-card" tabindex="0" aria-label="Trailhead — feature card">
+    <div class="orb-card__surface">
+
+      <div class="orb-card__glass" aria-hidden="true"></div>
+
+      <div class="orb-card__rings" aria-hidden="true">
+        <span class="orb-card__ring"></span>
+        <span class="orb-card__ring"></span>
+        <span class="orb-card__ring"></span>
+        <span class="orb-card__ring"></span>
+        <span class="orb-card__ring">
+          <!-- compass glyph -->
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M14.5 9.5 13 13l-3.5 1.5L11 11l3.5-1.5z" />
+          </svg>
+        </span>
+      </div>
+
+      <div class="orb-card__content">
+        <span class="orb-card__title">Trailhead</span>
+        <span class="orb-card__text">Offline maps, elevation profiles, and turn-by-turn routing for every trail you run, ride, or hike.</span>
+      </div>
+
+      <div class="orb-card__footer">
+        <div class="orb-card__actions">
+          <button type="button" class="orb-card__action" aria-label="Save this trail">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 21s-7.5-4.6-10-9.1C.4 8.3 2 4.5 5.6 4c2-.3 3.8.7 4.9 2.2C11.6 4.7 13.4 3.7 15.4 4c3.6.5 5.2 4.3 3.6 7.9C16.5 16.4 12 21 12 21z"/></svg>
+          </button>
+          <button type="button" class="orb-card__action" aria-label="View elevation chart">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 20 8 9l4 6 3-5 6 10z"/></svg>
+          </button>
+          <button type="button" class="orb-card__action" aria-label="Download offline map">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M4 19h16"/></svg>
+          </button>
+        </div>
+        <a href="#" class="orb-card__link">
+          <span>Open</span>
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m6 9 6 6 6-6"/></svg>
+        </a>
+      </div>
+
+    </div>
+  </article>
+
+</body>
+</html>
