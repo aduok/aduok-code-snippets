@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Letter Strings</title>
+<style>
+  :root{
+    --paper:#F2F1EC;
+    --ink:#141310;
+    --rule:#DBD9CE;
+    --faint:#8C8A7E;
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .page{
+    max-width:760px;
+    margin:0 auto;
+    padding:64px 24px 96px;
+  }
+  h1{
+    font-weight:900;
+    font-size:clamp(40px,8vw,72px);
+    letter-spacing:-0.01em;
+    text-align:center;
+    margin:0 0 6px;
+  }
+  .sub{
+    text-align:center;
+    font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+    font-size:11.5px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--faint);
+    margin:0 0 44px;
+  }
+  .frame{
+    border:0.5px solid var(--rule);
+    border-radius:2px;
+    padding:26px 22px;
+    position:relative;
+  }
+  .frame::before{
+    content:"";
+    position:absolute;
+    top:10px; left:10px; right:10px; bottom:10px;
+    border:0.5px solid var(--rule);
+    pointer-events:none;
+  }
+  #scaleWrap{
+    position:relative;
+    margin:0 auto;
+  }
+  #stage{
+    position:absolute;
+    top:0; left:0;
+    font-family:ui-monospace,'SF Mono','JetBrains Mono',Menlo,Consolas,monospace;
+    font-size:11px;
+    line-height:1;
+    transform-origin:top left;
+  }
+  #stage span{
+    position:absolute;
+    display:inline-block;
+    color:var(--ink);
+    transform-origin:0 50%;
+    will-change:transform,opacity;
+    user-select:none;
+    pointer-events:none;
+  }
+  .grabZone{
+    position:absolute;
+    top:0; left:0;
+    cursor:grab;
+  }
+  .grabZone:active{
+    cursor:grabbing;
+  }
+  .hint{
+    text-align:center;
+    font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+    font-size:11px;
+    letter-spacing:0.08em;
+    color:var(--faint);
+    margin-top:18px;
+  }
+  .sr-only{
+    position:absolute;
+    width:1px;height:1px;
+    overflow:hidden;
+    clip:rect(0,0,0,0);
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1 class="sr-only">Letter Strings — a cluster of code characters shaped into a form, with several loose threads hanging from it that swing like strings when dragged</h1>
+  <h1 aria-hidden="true">Letter Strings</h1>
+  <p class="sub">grab a thread and swing it</p>
+
+  <div class="frame">
+    <div id="scaleWrap">
+      <div id="stage"></div>
+    </div>
+  </div>
+
+  <p class="hint">drag any thread to swing it — hover the rest to stir them gently</p>
+</div>
+
+<script>
+(function(){
+
+  var W = 640, H = 560;
+  var scaleWrap = document.getElementById('scaleWrap');
+  var stage = document.getElementById('stage');
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  stage.style.width = W + 'px';
+  stage.style.height = H + 'px';
+
+  function fit(){
+    var frame = scaleWrap.parentElement;
+    var available = frame.clientWidth - 4;
+    var scale = Math.min(1, available / W);
+    stage.style.transform = 'scale(' + scale + ')';
+    scaleWrap.style.width = (W * scale) + 'px';
+    scaleWrap.style.height = (H * scale) + 'px';
+  }
+  window.addEventListener('resize', fit);
+
+  var SOURCE =
+"functionmain(){constfullCode=main.toString();const{width:aWidth,height:aheight,gridW,gridH,gravity,damping,iterationsPerFrame,compressFactor,stretchFactor,cellWidth,cellHeight}=CONFIG;constfontSize=Math.max(12,cellHeight*1.2);constchars=[...newSet(fullCode)].filter(ch=>ch!==''&&ch!=='n');constoff=document.createElement('canvas');off.width=width;off.height=height;constoctx=off.getContext('2d');octx.font=fontSize+'pxmonospace';octx.textAlign='center';octx.textBaseline='middle';octx.fillStyle='#333';forleti=0;i<chars.length;i++){constch=chars[i%chars.length];octx.fillText(ch,off.width/2,off.height/2);}constcontainer=document.getElementById('stage');container.innerHTML='';constparticles=[];constconstraints=[];constspringK=0.14;constdamp=0.86;forletrow=0;row<gridH;row++){forletcol=0;col<gridW;col++){constcellX=col*cellWidth;constcellY=row*cellHeight;constchar=fullCode[(row*gridW+col)%fullCode.length];particles.push(newParticle(cellX,cellY,char));}}functionstep(dt){forleti=0;i<particles.length;i++){constp=particles[i];constdx=p.homeX-p.x,dy=p.homeY-p.y;p.vx+=dx*springK;p.vy+=dy*springK;p.vx*=damp;p.vy*=damp;p.x+=p.vx;p.y+=p.vy;}}returnparticlesconstraintsstep;}";
+
+  var stripped = SOURCE.replace(/\s+/g,'');
+  var srcIdx = 0;
+  function nextChar(){
+    var ch = stripped[srcIdx % stripped.length];
+    srcIdx++;
+    return ch;
+  }
+
+  function mulberry32(seed){
+    return function(){
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      var t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  var rand = mulberry32(1337);
+
+  var maskCanvas = document.createElement('canvas');
+  maskCanvas.width = W; maskCanvas.height = H;
+  var mctx = maskCanvas.getContext('2d');
+
+  var cx = 240, cy = 165, R = 118;
+
+  mctx.fillStyle = '#000';
+  mctx.beginPath();
+  mctx.ellipse(cx, cy, R, R*0.9, 0, 0, Math.PI*2);
+  mctx.fill();
+  mctx.beginPath();
+  mctx.ellipse(cx - R*0.25, cy + R*0.55, R*0.6, R*0.4, 0.3, 0, Math.PI*2);
+  mctx.fill();
+
+  var maskData = mctx.getImageData(0,0,W,H).data;
+  function insideMask(x,y){
+    x = Math.round(x); y = Math.round(y);
+    if (x<0||y<0||x>=W||y>=H) return false;
+    var idx = (y*W + x) * 4 + 3;
+    return maskData[idx] > 100;
+  }
+
+  var CHAR_W = 7.4, LINE_H = 13.5;
+  var blobChars = [];
+
+  for (var gy = cy - R*1.05; gy < cy + R*1.05; gy += LINE_H){
+    for (var gx = cx - R*1.1; gx < cx + R*1.1; gx += CHAR_W){
+      if (insideMask(gx, gy)){
+        var ch = nextChar();
+        var jitterX = (rand()-0.5) * 1.4;
+        var jitterY = (rand()-0.5) * 1.4;
+        var rot = (rand()-0.5) * 10;
+        var span = document.createElement('span');
+        span.textContent = ch;
+        span.style.left = (gx + jitterX) + 'px';
+        span.style.top = (gy + jitterY) + 'px';
+        stage.appendChild(span);
+        blobChars.push({
+          el: span,
+          hx: gx + jitterX, hy: gy + jitterY,
+          baseRot: rot,
+          phase: rand() * Math.PI * 2
+        });
+      }
+    }
+  }
+
+  var SEG = 13;
+  var anchorAngles = [28, 55, 90, 118, 150];
+  var ropeLens = [26, 34, 22, 30, 38];
+  var strings = [];
+
+  for (var s = 0; s < anchorAngles.length; s++){
+    var rad = anchorAngles[s] * Math.PI / 180;
+    var anchorX = cx + Math.cos(rad) * R * 0.98;
+    var anchorY = cy + Math.sin(rad) * R * 0.9;
+    var len = ropeLens[s];
+    var nodes = [];
+    var curlDir = (rand() < 0.5 ? -1 : 1);
+    var curlCx = anchorX + curlDir * 40 + (rand()-0.5)*20;
+    var curlCy = anchorY + 60 + rand()*30;
+    var curlR = 30 + rand()*20;
+    for (var i = 0; i < len; i++){
+      var f = i / (len - 1);
+      var px, py;
+      if (i === 0){
+        px = anchorX; py = anchorY;
+      } else {
+        var ang = f * Math.PI * 2.2 * curlDir - 0.4*curlDir;
+        var rr = 14 + f * curlR;
+        px = curlCx + Math.cos(ang) * rr;
+        py = curlCy + Math.sin(ang) * rr * 0.7;
+      }
+      nodes.push({
+        x: px, y: py,
+        oldx: px, oldy: py,
+        pinned: (i === 0),
+        anchorX: anchorX, anchorY: anchorY,
+        char: nextChar()
+      });
+    }
+    var spans = nodes.map(function(n){
+      var span = document.createElement('span');
+      span.textContent = n.char;
+      stage.appendChild(span);
+      return span;
+    });
+    strings.push({
+      nodes: nodes,
+      spans: spans,
+      phase: rand() * Math.PI * 2,
+      freq: 0.3 + rand() * 0.4,
+      amp: 0.3 + rand() * 0.5
+    });
+  }
+
+  var grabZone = document.createElement('div');
+  grabZone.className = 'grabZone';
+  grabZone.style.width = W + 'px';
+  grabZone.style.height = H + 'px';
+  grabZone.setAttribute('aria-hidden','true');
+  stage.appendChild(grabZone);
+
+  var mouse = { x: -9999, y: -9999, active:false };
+  var stageRect;
+  function updateRect(){ stageRect = stage.getBoundingClientRect(); }
+
+  function localPoint(e){
+    updateRect();
+    var cxp = (e.touches ? e.touches[0].clientX : e.clientX);
+    var cyp = (e.touches ? e.touches[0].clientY : e.clientY);
+    var scale = stageRect.width / W;
+    return { x: (cxp - stageRect.left) / scale, y: (cyp - stageRect.top) / scale };
+  }
+
+  var dragString = -1, dragIndex = -1;
+  var GRAB_R = 24;
+
+  function nearestNode(p){
+    var bestS = -1, bestI = -1, bestD = GRAB_R;
+    for (var s = 0; s < strings.length; s++){
+      var nodes = strings[s].nodes;
+      for (var i = 1; i < nodes.length; i++){
+        var n = nodes[i];
+        var d = Math.hypot(n.x - p.x, n.y - p.y);
+        if (d < bestD){ bestD = d; bestS = s; bestI = i; }
+      }
+    }
+    return { s: bestS, i: bestI };
+  }
+
+  function onDown(e){
+    var p = localPoint(e);
+    var hit = nearestNode(p);
+    if (hit.i > 0){
+      dragString = hit.s; dragIndex = hit.i;
+      e.preventDefault();
+    }
+    mouse.x = p.x; mouse.y = p.y; mouse.active = true;
+  }
+  function onMove(e){
+    var p = localPoint(e);
+    mouse.x = p.x; mouse.y = p.y; mouse.active = true;
+    if (dragIndex > 0){
+      var n = strings[dragString].nodes[dragIndex];
+      n.x = p.x; n.y = p.y;
+    }
+  }
+  function onUp(){
+    dragString = -1; dragIndex = -1;
+  }
+
+  grabZone.addEventListener('mousedown', onDown);
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+  stage.addEventListener('mouseleave', function(){
+    if (dragIndex === -1){ mouse.active = false; mouse.x = -9999; mouse.y = -9999; }
+  });
+  grabZone.addEventListener('touchstart', onDown, {passive:false});
+  window.addEventListener('touchmove', onMove, {passive:true});
+  window.addEventListener('touchend', onUp);
+
+  var GRAVITY = 0.55;
+  var DAMPING = 0.985;
+  var ITER = 6;
+  var t0 = performance.now();
+
+  function simulateRopes(t){
+    for (var s = 0; s < strings.length; s++){
+      var st = strings[s];
+      var nodes = st.nodes;
+      var breeze = Math.sin(t * st.freq + st.phase) * st.amp;
+
+      for (var i = 1; i < nodes.length; i++){
+        if (s === dragString && i === dragIndex) continue;
+        var n = nodes[i];
+        var vx = (n.x - n.oldx) * DAMPING;
+        var vy = (n.y - n.oldy) * DAMPING;
+        n.oldx = n.x; n.oldy = n.y;
+        n.x += vx + breeze * (i / nodes.length) * 0.06;
+        n.y += vy + GRAVITY;
+      }
+
+      if (mouse.active && s !== dragString){
+        for (var i2 = 1; i2 < nodes.length; i2++){
+          var nd = nodes[i2];
+          var dx = nd.x - mouse.x, dy = nd.y - mouse.y;
+          var dist = Math.hypot(dx,dy);
+          if (dist < 80 && dist > 0.01){
+            var f = (1 - dist/80) * 1.0;
+            nd.x += (dx/dist) * f;
+            nd.y += (dy/dist) * f;
+          }
+        }
+      }
+
+      for (var iter = 0; iter < ITER; iter++){
+        for (var i3 = 0; i3 < nodes.length - 1; i3++){
+          var a = nodes[i3], b = nodes[i3+1];
+          var dx2 = b.x - a.x, dy2 = b.y - a.y;
+          var dist2 = Math.hypot(dx2,dy2) || 0.0001;
+          var diff = (dist2 - SEG) / dist2;
+          var offX = dx2 * 0.5 * diff, offY = dy2 * 0.5 * diff;
+
+          var aFixed = a.pinned || (s === dragString && i3 === dragIndex);
+          var bFixed = b.pinned || (s === dragString && (i3+1) === dragIndex);
+
+          if (!aFixed && !bFixed){
+            a.x += offX; a.y += offY;
+            b.x -= offX; b.y -= offY;
+          } else if (aFixed && !bFixed){
+            b.x -= offX*2; b.y -= offY*2;
+          } else if (!aFixed && bFixed){
+            a.x += offX*2; a.y += offY*2;
+          }
+        }
+        nodes[0].x = nodes[0].anchorX;
+        nodes[0].y = nodes[0].anchorY;
+      }
+    }
+  }
+
+  function renderRopes(){
+    for (var s = 0; s < strings.length; s++){
+      var st = strings[s];
+      var nodes = st.nodes, spans = st.spans;
+      for (var i = 0; i < nodes.length; i++){
+        var n = nodes[i];
+        var nxt = nodes[i+1] || n;
+        var ang = Math.atan2(nxt.y - n.y, nxt.x - n.x) * 180 / Math.PI - 90;
+        var span = spans[i];
+        span.style.left = n.x + 'px';
+        span.style.top = n.y + 'px';
+        span.style.transform = 'rotate(' + ang.toFixed(1) + 'deg)';
+      }
+    }
+  }
+
+  function renderBlob(t){
+    for (var i = 0; i < blobChars.length; i++){
+      var b = blobChars[i];
+      var dx = b.hx - mouse.x, dy = b.hy - mouse.y;
+      var dist = Math.hypot(dx,dy);
+      var wob = Math.sin(t*0.9 + b.phase) * 0.4;
+      var pushX = 0, pushY = 0;
+      if (dist < 70 && dist > 0.01){
+        var fs = (1 - dist/70);
+        pushX = (dx/dist) * fs * 4;
+        pushY = (dy/dist) * fs * 4;
+      }
+      b.el.style.transform =
+        'translate(' + (pushX + wob).toFixed(2) + 'px,' + (pushY + wob*0.6).toFixed(2) + 'px) rotate(' + b.baseRot.toFixed(1) + 'deg)';
+    }
+  }
+
+  function frame(now){
+    var t = (now - t0) / 1000;
+    simulateRopes(t);
+    renderRopes();
+    renderBlob(t);
+    requestAnimationFrame(frame);
+  }
+
+  fit();
+  if (reduceMotion){
+    renderRopes();
+    for (var i4 = 0; i4 < blobChars.length; i4++){
+      blobChars[i4].el.style.transform = 'rotate(' + blobChars[i4].baseRot.toFixed(1) + 'deg)';
+    }
+  } else {
+    requestAnimationFrame(frame);
+  }
+})();
+</script>
+</body>
+</html>
