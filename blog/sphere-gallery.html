@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>3D Sphere Gallery — Scroll Component</title>
+
+<style>
+  /* =========================================================
+     Design tokens
+     ========================================================= */
+  :root {
+    --bg: #0a0a0b;
+    --surface: #17171a;
+    --text: #f4f4f5;
+    --text-muted: #9a9aa2;
+    --ring: rgba(255, 255, 255, 0.06);
+    --shadow-deep: rgba(0, 0, 0, 0.75);
+
+    --card-w: 150px;
+    --card-h: 200px;
+    --sphere-radius: 380px;
+    --rotations: 2; /* full turns across the whole scroll length */
+  }
+
+  @media (max-width: 720px) {
+    :root {
+      --card-w: 100px;
+      --card-h: 138px;
+      --sphere-radius: 190px;
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { color-scheme: dark; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+
+  /* =========================================================
+     Layout scaffolding (just enough to demo scroll behaviour)
+     ========================================================= */
+  .spacer {
+    height: 60vh;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    padding: 2rem;
+  }
+  .spacer p { color: var(--text-muted); max-width: 32ch; }
+
+  /* =========================================================
+     Gallery section
+     ========================================================= */
+  .sphere-gallery {
+    position: relative;
+    /* Scroll distance = how long the rotation/reveal plays out for */
+    height: 320vh;
+  }
+
+  .sphere-gallery__stage {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    width: 100%;
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+    perspective: 1400px;
+  }
+
+  /* Radial vignette so cards fade into the background at the edges */
+  .sphere-gallery__stage::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(circle at center, transparent 45%, var(--bg) 92%);
+  }
+
+  .sphere-gallery__caption {
+    position: absolute;
+    left: 6%;
+    top: 50%;
+    transform: translateY(-50%);
+    max-width: 320px;
+    z-index: 3;
+  }
+
+  .sphere-gallery__caption .index {
+    display: block;
+    font-size: 0.8rem;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+  }
+
+  .sphere-gallery__caption h2 {
+    font-size: clamp(1.5rem, 3vw, 2.1rem);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.75rem;
+    text-shadow: 0 6px 20px var(--shadow-deep);
+  }
+
+  .sphere-gallery__caption p {
+    color: var(--text-muted);
+    font-size: 0.92rem;
+  }
+
+  @media (max-width: 720px) {
+    .sphere-gallery__caption {
+      left: 50%;
+      top: auto;
+      bottom: 6%;
+      transform: translateX(-50%);
+      text-align: center;
+      width: 88%;
+    }
+  }
+
+  .sphere {
+    position: relative;
+    width: 0;
+    height: 0;
+    transform-style: preserve-3d;
+    will-change: transform;
+  }
+
+  .sphere-card {
+    position: absolute;
+    width: var(--card-w);
+    height: var(--card-h);
+    left: calc(var(--card-w) / -2);
+    top: calc(var(--card-h) / -2);
+    border-radius: 14px;
+    padding: 6px;
+    background: var(--surface);
+    border: 1px solid var(--ring);
+    transform-style: preserve-3d;
+    box-shadow:
+      6px 6px 14px var(--shadow-deep),
+      inset 1px 1px 2px rgba(255, 255, 255, 0.05),
+      inset -2px -2px 4px rgba(0, 0, 0, 0.5);
+    transition: filter 0.35s ease, box-shadow 0.35s ease;
+  }
+
+  .sphere-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 9px;
+    display: block;
+    filter: grayscale(75%) brightness(0.55);
+    transition: filter 0.4s ease;
+  }
+
+  .sphere-card.is-focused {
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.15),
+      0 12px 30px var(--shadow-deep);
+  }
+  .sphere-card.is-focused img {
+    filter: grayscale(0%) brightness(1);
+  }
+
+  /* =========================================================
+     Reduced motion: show a static, legible arrangement instead
+     of relying on scroll-driven 3D transforms.
+     ========================================================= */
+  @media (prefers-reduced-motion: reduce) {
+    .sphere-gallery { height: auto; }
+    .sphere-gallery__stage { position: relative; height: auto; padding: 4rem 1rem; }
+    .sphere { position: static; display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; }
+    .sphere-card {
+      position: static;
+      transform: none !important;
+    }
+    .sphere-card img { filter: none; }
+    .sphere-gallery__caption { position: static; transform: none; margin: 0 auto 2rem; text-align: center; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="spacer">
+    <p>Scroll down — the sphere rotates in step with scroll position, and the caption swaps as new faces come to the front.</p>
+  </div>
+
+  <section class="sphere-gallery" aria-label="Rotating image gallery">
+    <div class="sphere-gallery__stage">
+
+      <div class="sphere-gallery__caption">
+        <span class="index" id="galleryIndex">01 / 04</span>
+        <h2 id="galleryTitle">Running Through Reflection</h2>
+        <p id="galleryDesc">Shot on a rainy day at a running track — the wet surface throws back a blurred silhouette as the runner passes.</p>
+      </div>
+
+      <div class="sphere" id="sphere" role="list"></div>
+    </div>
+  </section>
+
+  <div class="spacer">
+    <p>End of gallery scroll region.</p>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+
+  const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ---------------------------------------------------------
+  // Content
+  // ---------------------------------------------------------
+  const images = Array.from({ length: 18 }, (_, i) => `https://picsum.photos/seed/gallery-${i}/300/400`);
+
+  const captions = [
+    { title: "Running Through Reflection", desc: "Shot on a rainy day at a running track — the wet surface throws back a blurred silhouette as the runner passes." },
+    { title: "Elegance in Boldness", desc: "Captured in a controlled studio setting, leaning on strong features and deep contrast." },
+    { title: "Dynamic Moments", desc: "Pure speed and raw emotion, held in a single split-second frame." },
+    { title: "Abstract Movement", desc: "Long exposures and deliberate camera motion, turning time itself into the subject." },
+  ];
+
+  const stage = document.querySelector(".sphere-gallery__stage");
+  const sphereEl = document.getElementById("sphere");
+  const titleEl = document.getElementById("galleryTitle");
+  const descEl = document.getElementById("galleryDesc");
+  const indexEl = document.getElementById("galleryIndex");
+
+  // ---------------------------------------------------------
+  // Build the sphere: even distribution via the Fibonacci
+  // sphere algorithm, so cards never bunch up at the poles.
+  // ---------------------------------------------------------
+  let radius = getComputedRadius();
+  const cards = [];
+
+  function getComputedRadius() {
+    const value = getComputedStyle(document.documentElement).getPropertyValue("--sphere-radius");
+    return parseFloat(value) || 380;
+  }
+
+  function buildSphere() {
+    sphereEl.innerHTML = "";
+    cards.length = 0;
+    radius = getComputedRadius();
+
+    const count = images.length;
+    images.forEach((src, i) => {
+      const card = document.createElement("div");
+      card.className = "sphere-card";
+      card.setAttribute("role", "listitem");
+
+      const img = document.createElement("img");
+      img.src = src;
+      img.loading = "lazy";
+      img.alt = "";
+      card.appendChild(img);
+
+      const phi = Math.acos(1 - (2 * (i + 0.5)) / count);
+      const theta = Math.PI * (1 + Math.sqrt(5)) * i;
+
+      const x = radius * Math.cos(theta) * Math.sin(phi);
+      const y = radius * Math.sin(theta) * Math.sin(phi);
+      const z = radius * Math.cos(phi);
+
+      const rotY = Math.atan2(x, z) * (180 / Math.PI);
+      const rotX = Math.asin(-y / radius) * (180 / Math.PI);
+
+      card.style.transform = `translate3d(${x}px, ${y}px, ${z}px) rotateY(${rotY}deg) rotateX(${rotX}deg)`;
+      card.dataset.z = z.toFixed(2);
+
+      sphereEl.appendChild(card);
+      cards.push(card);
+    });
+  }
+
+  buildSphere();
+
+  if (prefersReducedMotion) {
+    // Static grid already handled by CSS; nothing further to animate.
+    return;
+  }
+
+  // ---------------------------------------------------------
+  // Scroll-driven rotation (no external animation library —
+  // rAF-throttled scroll handler keeps this dependency-free).
+  // ---------------------------------------------------------
+  const rotations = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--rotations")) || 2;
+  let ticking = false;
+  let currentCaption = -1;
+
+  function getScrollProgress() {
+    const section = document.querySelector(".sphere-gallery");
+    const rect = section.getBoundingClientRect();
+    const total = rect.height - window.innerHeight;
+    if (total <= 0) return 0;
+    const scrolled = -rect.top;
+    return Math.min(1, Math.max(0, scrolled / total));
+  }
+
+  function updateCaption(progress) {
+    const idx = Math.min(captions.length - 1, Math.floor(progress * captions.length));
+    if (idx === currentCaption) return;
+    currentCaption = idx;
+
+    const { title, desc } = captions[idx];
+    titleEl.style.opacity = 0;
+    descEl.style.opacity = 0;
+
+    window.setTimeout(() => {
+      titleEl.textContent = title;
+      descEl.textContent = desc;
+      indexEl.textContent = `0${idx + 1} / 0${captions.length}`;
+      titleEl.style.opacity = 1;
+      descEl.style.opacity = 1;
+    }, 150);
+  }
+
+  function updateFocusedCards(progress) {
+    const focusIndex = Math.round(progress * (cards.length - 1));
+    cards.forEach((card, i) => {
+      card.classList.toggle("is-focused", Math.abs(i - focusIndex) < 2);
+    });
+  }
+
+  function onScroll() {
+    if (ticking) return;
+    ticking = true;
+
+    requestAnimationFrame(() => {
+      const progress = getScrollProgress();
+      const rotateY = progress * 360 * rotations;
+      const rotateX = progress * 40;
+
+      sphereEl.style.transform = `rotateY(${rotateY}deg) rotateX(${rotateX}deg)`;
+
+      updateCaption(progress);
+      updateFocusedCards(progress);
+      ticking = false;
+    });
+  }
+
+  titleEl.style.transition = "opacity 0.15s ease";
+  descEl.style.transition = "opacity 0.15s ease";
+
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+
+  // Rebuild on resize (debounced) so the radius/card size stay in sync
+  // with the CSS custom properties at the new breakpoint.
+  let resizeTimer;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(buildSphere, 200);
+  });
+})();
+</script>
+
+</body>
+</html>
