@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Image Wave Scroll</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: radial-gradient(circle at 50% 30%, #14161b 0%, #05060a 75%);
+    cursor: grab;
+  }
+  body:active { cursor: grabbing; }
+  canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    display: block;
+  }
+  #loading {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: rgba(255,255,255,0.55);
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    z-index: 10;
+  }
+  ::-webkit-scrollbar { display: none; }
+</style>
+</head>
+<body>
+
+<div id="loading">Loading</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+  // ---- image set (different theme / different source than the reference) ----
+  const SEEDS = ['aurora','glacier','canyon','dune','fjord','basalt','tundra','mesa',
+                 'lagoon','ridge','delta','cavern','plateau','marsh','reef','crater',
+                 'summit','grove','estuary','moor'];
+  const imageUrls = SEEDS.map((s, i) => `https://picsum.photos/seed/${s}${i}/700/${900 + (i % 3) * 150}`);
+
+  let scrollY = 0, targetScrollY = 0, scrollVelocity = 0;
+  let material, scene, camera, renderer;
+  const originalImages = [];
+  let loadedCount = 0;
+
+  const cfg = {
+    bandWidth: 260,
+    curvatureIntensity: 55.0,
+    curvatureFrequency: 0.0016,
+    bandColor: '#0e0f13',
+    speed: 1.6,
+    edgeSoftness: 2.0
+  };
+
+  scene = new THREE.Scene();
+  camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x000000, 0);
+  document.body.appendChild(renderer.domElement);
+  camera.position.z = 1;
+
+  function loadImages() {
+    imageUrls.forEach((url, i) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      originalImages[i] = { loaded: false, img: null };
+      img.onload = () => {
+        originalImages[i] = { loaded: true, img };
+        loadedCount++;
+        if (loadedCount === imageUrls.length) finishLoading();
+      };
+      img.onerror = () => { fallback(i); };
+      img.src = url;
+    });
+  }
+
+  function fallback(i) {
+    const c = document.createElement('canvas');
+    c.width = 280; c.height = 360;
+    const ctx = c.getContext('2d');
+    const hue = (i * 360 / imageUrls.length) % 360;
+    const g = ctx.createLinearGradient(0, 0, 0, 360);
+    g.addColorStop(0, `hsl(${hue},35%,22%)`);
+    g.addColorStop(1, `hsl(${hue},35%,10%)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 280, 360);
+    originalImages[i] = { loaded: true, img: c };
+    loadedCount++;
+    if (loadedCount === imageUrls.length) finishLoading();
+  }
+
+  function finishLoading() {
+    setTimeout(() => {
+      document.getElementById('loading').style.display = 'none';
+      buildBand();
+      animate();
+    }, 300);
+  }
+
+  function buildBand() {
+    const BAND_WIDTH = cfg.bandWidth;
+    const IMAGE_WIDTH = BAND_WIDTH - 30;
+    const GAP = 18;
+    const PAD = 4;
+
+    let seqHeight = 0;
+    const heights = originalImages.map(info => {
+      const h = Math.round(IMAGE_WIDTH * (info.img.height / info.img.width));
+      seqHeight += h + GAP;
+      return h;
+    });
+
+    const canvasHeight = seqHeight + PAD;
+    const canvas = document.createElement('canvas');
+    canvas.width = BAND_WIDTH;
+    canvas.height = canvasHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.fillStyle = cfg.bandColor;
+    ctx.fillRect(0, 0, BAND_WIDTH, canvasHeight);
+
+    let y = 0;
+    originalImages.forEach((info, i) => {
+      const h = heights[i];
+      const x = (BAND_WIDTH - IMAGE_WIDTH) / 2;
+      ctx.drawImage(info.img, x, y, IMAGE_WIDTH, h);
+      y += h + GAP;
+    });
+    // seam wrap
+    const first = originalImages[0];
+    if (first) {
+      const x = (BAND_WIDTH - IMAGE_WIDTH) / 2;
+      ctx.drawImage(first.img, x, seqHeight, IMAGE_WIDTH, heights[0]);
+    }
+
+    const texture = new THREE.Texture(canvas);
+    texture.needsUpdate = true;
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.generateMipmaps = false;
+
+    material = new THREE.ShaderMaterial({
+      uniforms: {
+        uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+        uTexture: { value: texture },
+        uTextureHeight: { value: canvasHeight },
+        uBandWidth: { value: BAND_WIDTH },
+        uScroll: { value: 0 },
+        uSpeed: { value: cfg.speed },
+        uCurvatureIntensity: { value: cfg.curvatureIntensity },
+        uCurvatureFrequency: { value: cfg.curvatureFrequency },
+        uEdgeSoftness: { value: cfg.edgeSoftness }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec2 uResolution;
+        uniform sampler2D uTexture;
+        uniform float uTextureHeight;
+        uniform float uBandWidth;
+        uniform float uScroll;
+        uniform float uSpeed;
+        uniform float uCurvatureIntensity;
+        uniform float uCurvatureFrequency;
+        uniform float uEdgeSoftness;
+        varying vec2 vUv;
+
+        void main() {
+          vec2 pixelCoord = vUv * uResolution;
+          float bandLeftBase = (uResolution.x - uBandWidth) * 0.5;
+
+          float scrollPos = uScroll * uSpeed;
+          float normalizedY = pixelCoord.y / uResolution.y;
+
+          float waveY = pixelCoord.y + scrollPos;
+          float curve1 = sin(waveY * uCurvatureFrequency) * uCurvatureIntensity;
+          float curve2 = sin(waveY * uCurvatureFrequency * 2.3 + 1.3) * uCurvatureIntensity * 0.35;
+          float curveOffset = curve1 + curve2;
+
+          float centerWeight = 1.0 - abs(normalizedY - 0.5) * 2.0;
+          centerWeight = smoothstep(0.0, 1.0, centerWeight);
+
+          float bandLeft = bandLeftBase + curveOffset * centerWeight;
+          float bandRight = bandLeft + uBandWidth;
+
+          float leftAlpha = smoothstep(bandLeft, bandLeft + uEdgeSoftness, pixelCoord.x);
+          float rightAlpha = smoothstep(bandRight, bandRight - uEdgeSoftness, pixelCoord.x);
+          float bandAlpha = leftAlpha * rightAlpha;
+          if (bandAlpha <= 0.001) discard;
+
+          float scrolledY = pixelCoord.y + scrollPos;
+          float uvPadding = 1.0 / uTextureHeight;
+          float texY = fract(scrolledY / uTextureHeight);
+          texY = mix(uvPadding, 1.0 - uvPadding, texY);
+          float texX = (pixelCoord.x - bandLeft) / uBandWidth;
+
+          vec4 color = texture2D(uTexture, vec2(texX, texY));
+
+          float depth = clamp(abs(curveOffset) / uCurvatureIntensity, 0.0, 1.0);
+          color.rgb *= 1.0 - depth * 0.12;
+
+          float edgeGlow = (1.0 - leftAlpha) + (1.0 - rightAlpha);
+          color.rgb += vec3(0.05, 0.05, 0.07) * (1.0 - bandAlpha) * 0.0;
+
+          gl_FragColor = vec4(color.rgb, color.a * bandAlpha);
+        }
+      `,
+      transparent: true
+    });
+
+    const geometry = new THREE.PlaneGeometry(2, 2);
+    scene.add(new THREE.Mesh(geometry, material));
+  }
+
+  // ---- input: wheel / drag / touch, with inertia ----
+  let isDragging = false, lastY = 0;
+  const inertia = 0.92;
+
+  document.addEventListener('wheel', e => {
+    e.preventDefault();
+    const delta = e.deltaY * 2.0;
+    targetScrollY += delta;
+    scrollVelocity = delta * 0.15;
+  }, { passive: false });
+
+  document.addEventListener('keydown', e => {
+    if (e.ctrlKey || e.altKey || e.metaKey) return;
+    if (e.key === 'ArrowUp') { e.preventDefault(); targetScrollY -= 100; scrollVelocity = -15; }
+    if (e.key === 'ArrowDown') { e.preventDefault(); targetScrollY += 100; scrollVelocity = 15; }
+  });
+
+  document.addEventListener('mousedown', e => {
+    isDragging = true; lastY = e.clientY; scrollVelocity = 0;
+    document.body.style.cursor = 'grabbing';
+  });
+  document.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    const dy = e.clientY - lastY;
+    targetScrollY += dy * 2.0;
+    lastY = e.clientY;
+    scrollVelocity = dy * 0.25;
+  });
+  document.addEventListener('mouseup', () => {
+    isDragging = false;
+    document.body.style.cursor = 'grab';
+  });
+
+  let lastTouchY = 0;
+  document.addEventListener('touchstart', e => { lastTouchY = e.touches[0].clientY; }, { passive: false });
+  document.addEventListener('touchmove', e => {
+    e.preventDefault();
+    const ty = e.touches[0].clientY;
+    const dy = ty - lastTouchY;
+    targetScrollY += dy * 2.5;
+    lastTouchY = ty;
+    scrollVelocity = dy * 0.3;
+  }, { passive: false });
+
+  function applyInertia() {
+    if (!isDragging) {
+      targetScrollY += scrollVelocity;
+      scrollVelocity *= inertia;
+      if (Math.abs(scrollVelocity) < 0.5) scrollVelocity = 0;
+    }
+  }
+
+  function animate() {
+    requestAnimationFrame(animate);
+    applyInertia();
+    const smoothing = isDragging ? 0.3 : 0.1;
+    scrollY += (targetScrollY - scrollY) * smoothing;
+    if (material) {
+      material.uniforms.uScroll.value = scrollY;
+      material.uniforms.uResolution.value.set(window.innerWidth, window.innerHeight);
+    }
+    renderer.render(scene, camera);
+  }
+
+  window.addEventListener('resize', () => {
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    if (material) material.uniforms.uResolution.value.set(window.innerWidth, window.innerHeight);
+  });
+
+  renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+
+  loadImages();
+})();
+</script>
+</body>
+</html>
