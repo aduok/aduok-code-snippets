@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Code Curtain</title>
+<style>
+  @import url("https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap");
+
+  body {
+    background: #eee;
+    margin: 0;
+    display: flex;
+    min-height: 100vh;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  canvas {
+    max-height: 100vh;
+    max-width: 100vw;
+    height: auto;
+    width: auto;
+  }
+  #container {
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: none;
+  }
+</style>
+</head>
+<body>
+<div id="container"></div>
+
+<script id="weave-source">
+"use strict";
+
+/* =====================================================================
+   A drapery of the page's own text, hanging under gravity and stirred
+   by the pointer. Same behaviour as the reference sketch; naming and
+   structure rebuilt from scratch around a single Loom instance.
+   ===================================================================== */
+
+const FONT_FAMILY = "Space Mono";
+
+class Sprite {
+  // Pre-renders one character to an offscreen bitmap so the render
+  // loop only ever does drawImage, never fillText.
+  constructor(character, pixelSize, pixelRatio) {
+    const margin = 1.4;
+    this.extent = Math.ceil(pixelSize * margin);
+
+    const plate = document.createElement("canvas");
+    plate.width = plate.height = this.extent * pixelRatio;
+    const brush = plate.getContext("2d");
+    brush.scale(pixelRatio, pixelRatio);
+    brush.font = `700 ${pixelSize}px "${FONT_FAMILY}", monospace`;
+    brush.textAlign = "center";
+    brush.textBaseline = "middle";
+    brush.fillStyle = "#2a2a2a";
+    brush.fillText(character, this.extent / 2, this.extent / 2);
+
+    this.bitmap = plate;
+  }
+}
+
+class Knot {
+  // A single mass point in the weave.
+  constructor(x, y, anchored, sprite) {
+    this.x = x; this.y = y;
+    this.lastX = x; this.lastY = y;
+    this.pushX = 0; this.pushY = 0;
+    this.anchored = anchored;
+    this.sprite = sprite;
+    this.spine = null; // the Thread running below this knot, for tilt
+  }
+  nudge(fx, fy) { this.pushX += fx; this.pushY += fy; }
+  advance(dtSq, pull) {
+    if (this.anchored) { this.pushX = this.pushY = 0; return; }
+    const vx = (this.x - this.lastX) * Loom.FRICTION;
+    const vy = (this.y - this.lastY) * Loom.FRICTION;
+    this.lastX = this.x; this.lastY = this.y;
+    this.x += vx + this.pushX * dtSq;
+    this.y += vy + (this.pushY + pull) * dtSq;
+    this.pushX = this.pushY = 0;
+  }
+}
+
+class Thread {
+  // A distance constraint between two knots, clamped to a stretch band.
+  constructor(start, end, rest, floorRatio, ceilRatio) {
+    this.start = start; this.end = end;
+    this.rest = rest;
+    this.floor = rest * floorRatio;
+    this.ceil = rest * ceilRatio;
+  }
+  tighten() {
+    const dx = this.end.x - this.start.x, dy = this.end.y - this.start.y;
+    const span = Math.hypot(dx, dy) || 0.0001;
+    let goal = this.rest;
+    if (span < this.floor) goal = this.floor;
+    else if (span > this.ceil) goal = this.ceil;
+    else return;
+    const shift = (goal - span) / span / 2;
+    const ox = dx * shift, oy = dy * shift;
+    if (!this.start.anchored) { this.start.x -= ox; this.start.y -= oy; }
+    if (!this.end.anchored) { this.end.x += ox; this.end.y += oy; }
+  }
+}
+
+class Loom {
+  static FRICTION = 0.99;
+  static PULL = 0.2;
+  static RELAX_PASSES = 5;
+
+  constructor(host, rawText) {
+    this.host = host;
+    this.text = rawText.replace(/\s+/g, " ").trim();
+    this.pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+    this.cursor = { x: -9999, y: -9999, held: false };
+
+    this.plate = document.createElement("canvas");
+    this.plate.style.cursor = "grab";
+    host.appendChild(this.plate);
+    this.brush = this.plate.getContext("2d");
+
+    this.listen();
+    window.addEventListener("resize", () => this.arrange());
+
+    document.fonts.load(`700 20px "${FONT_FAMILY}"`).finally(() => {
+      this.arrange();
+      requestAnimationFrame((t) => this.frame(t));
+    });
+  }
+
+  /* ---------- sizing / construction ---------- */
+
+  arrange() {
+    this.panelW = Math.min(420, window.innerWidth - 80);
+    this.panelH = Math.min(420, window.innerWidth - 80, window.innerHeight - 80);
+
+    this.plate.style.width = window.innerWidth + "px";
+    this.plate.style.height = window.innerHeight + "px";
+    this.plate.width = Math.round(window.innerWidth * this.pixelRatio);
+    this.plate.height = Math.round(window.innerHeight * this.pixelRatio);
+
+    this.columns = Math.min(36, Math.floor(this.panelW / 11));
+    this.rows = Math.min(30, Math.floor(this.panelH / 11));
+    this.stepX = this.panelW / (this.columns - 1);
+    this.stepY = this.panelH / (this.rows - 1);
+
+    this.stockSprites();
+    this.weave();
+  }
+
+  stockSprites() {
+    const glyphSize = Math.max(11, this.stepY * 1.15);
+    this.sprites = new Map();
+    for (const ch of new Set(this.text)) {
+      if (ch === " ") continue;
+      this.sprites.set(ch, new Sprite(ch, glyphSize, this.pixelRatio));
+    }
+  }
+
+  weave() {
+    const { columns, rows, stepX, stepY } = this;
+    this.knots = [];
+    this.threads = [];
+
+    const knotAt = (row, col) => this.knots[row * columns + col];
+
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < columns; col++) {
+        const ch = this.text[(col + row * columns) % this.text.length] || " ";
+        const sprite = this.sprites.get(ch) || null;
+        this.knots.push(new Knot(col * stepX, row * stepY, row === 0, sprite));
+      }
+    }
+
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < columns; col++) {
+        const knot = knotAt(row, col);
+        if (row < rows - 1) {
+          const below = knotAt(row + 1, col);
+          const spine = new Thread(knot, below, stepY, 0.02, 1.1);
+          this.threads.push(spine);
+          knot.spine = spine;
+        }
+        if (col < columns - 1) {
+          this.threads.push(new Thread(knot, knotAt(row, col + 1), stepX, 0.6, 4));
+        }
+      }
+    }
+  }
+
+  /* ---------- pointer interaction ---------- */
+
+  listen() {
+    const project = (e) => {
+      const bounds = this.plate.getBoundingClientRect();
+      const offX = (this.plate.width / this.pixelRatio - this.panelW) / 2;
+      const offY = (this.plate.height / this.pixelRatio - this.panelH) / 2 - 30;
+      return { x: e.clientX - bounds.left - offX, y: e.clientY - bounds.top - offY };
+    };
+    window.addEventListener("pointerdown", (e) => {
+      this.cursor.held = true;
+      Object.assign(this.cursor, project(e));
+    });
+    window.addEventListener("pointerup", () => { this.cursor.held = false; });
+    window.addEventListener("pointermove", (e) => {
+      Object.assign(this.cursor, project(e));
+      this.disturb();
+    });
+    this.plate.addEventListener("contextmenu", (e) => e.preventDefault());
+  }
+
+  disturb() {
+    const REACH_SQ = 5000, FORCE = 4;
+    for (const k of this.knots) {
+      const dx = k.x - this.cursor.x, dy = k.y - this.cursor.y;
+      const distSq = dx * dx + dy * dy;
+      if (distSq >= REACH_SQ) continue;
+      const falloff = 1 - distSq / REACH_SQ;
+      const dist = Math.sqrt(distSq) || 0.0001;
+      k.nudge((dx / dist) * falloff * FORCE, (dy / dist) * falloff * FORCE);
+    }
+  }
+
+  /* ---------- simulate + paint ---------- */
+
+  frame(time) {
+    requestAnimationFrame((next) => this.frame(next));
+    const dt = this.prevTime ? Math.min(2, (time - this.prevTime) / 16.7) : 1;
+    this.prevTime = time;
+    const dtSq = dt * dt;
+
+    for (const k of this.knots) k.advance(dtSq, Loom.PULL);
+    for (let i = 0; i < Loom.RELAX_PASSES; i++) {
+      for (const t of this.threads) t.tighten();
+    }
+    this.paint();
+  }
+
+  paint() {
+    const brush = this.brush;
+    const offX = (this.plate.width / this.pixelRatio - this.panelW) / 2;
+    const offY = (this.plate.height / this.pixelRatio - this.panelH) / 2 - 30;
+
+    brush.save();
+    brush.clearRect(0, 0, this.plate.width, this.plate.height);
+
+    for (const k of this.knots) {
+      if (!k.sprite) continue;
+      let angle = 0;
+      if (k.spine) {
+        angle = Math.atan2(k.spine.end.y - k.spine.start.y, k.spine.end.x - k.spine.start.x) - Math.PI / 2;
+      }
+      const cos = Math.cos(angle), sin = Math.sin(angle);
+      const tx = k.x + offX, ty = k.y + offY;
+      brush.setTransform(this.pixelRatio * cos, this.pixelRatio * sin, -this.pixelRatio * sin, this.pixelRatio * cos, this.pixelRatio * tx, this.pixelRatio * ty);
+      const half = k.sprite.extent / 2;
+      brush.drawImage(k.sprite.bitmap, -half, -half, k.sprite.extent, k.sprite.extent);
+    }
+
+    brush.restore();
+  }
+}
+
+// The weave is spun from its own script text, read straight off the
+// <script> tag rather than via Function#toString().
+new Loom(document.getElementById("container"), document.getElementById("weave-source").textContent);
+</script>
+</body>
+</html>
