@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Workplace Hierarchy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/MotionPathPlugin.min.js"></script>
+<style>
+  :root{
+    --bg: #16221b;
+    --bg-deep: #0d1510;
+    --raise: #223528;
+    --shadow-light: #2c4433;
+    --shadow-dark: #050906;
+    --text: #eef1e9;
+    --text-muted: #91a698;
+    --brass: #cda85b;
+    --brass-soft: rgba(205,168,91,0.16);
+    --coral: #e2725b;
+    --moss: #7fae6f;
+    --sky: #6fa8c9;
+    --plum: #a67bb0;
+    --font-display: "Fraunces", serif;
+    --font-body: "Work Sans", sans-serif;
+    --font-mono: "IBM Plex Mono", monospace;
+  }
+
+  *{ box-sizing: border-box; }
+
+  html, body{
+    margin:0; padding:0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    overflow-x: hidden;
+    overscroll-behavior: none;
+  }
+
+  body{
+    background-image:
+      radial-gradient(ellipse at 20% 10%, rgba(205,168,91,0.05), transparent 55%),
+      radial-gradient(ellipse at 80% 90%, rgba(111,168,201,0.05), transparent 55%);
+  }
+
+  /* fixed header / masthead */
+  .masthead{
+    position: fixed;
+    top: 28px; left: 32px;
+    z-index: 200;
+    pointer-events: none;
+  }
+  .eyebrow{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--brass);
+    margin: 0 0 6px 0;
+  }
+  .masthead h1{
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-style: normal;
+    font-size: 28px;
+    margin: 0;
+    color: var(--text);
+    max-width: 380px;
+    line-height: 1.15;
+  }
+  .masthead p{
+    font-family: var(--font-body);
+    font-size: 13px;
+    color: var(--text-muted);
+    margin: 8px 0 0 0;
+    max-width: 340px;
+    line-height: 1.5;
+  }
+
+  /* progress rail */
+  .progress-rail{
+    position: fixed;
+    bottom: 0; left: 0;
+    width: 100%;
+    height: 3px;
+    background: rgba(255,255,255,0.05);
+    z-index: 200;
+  }
+  .progress-fill{
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--brass), var(--moss));
+    transform-origin: left;
+  }
+
+  .scroll-instruction{
+    position: fixed;
+    bottom: 36px; left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    z-index: 150;
+    animation: drift 2.2s infinite ease-in-out;
+    pointer-events: none;
+    background: var(--raise);
+    padding: 10px 22px;
+    border-radius: 999px;
+    box-shadow: 6px 6px 14px var(--shadow-dark), -6px -6px 14px var(--shadow-light);
+    border: 1px solid rgba(255,255,255,0.04);
+  }
+  @keyframes drift{
+    0%,100%{ transform: translate(-50%, 0); }
+    50%{ transform: translate(14px, 0); }
+  }
+
+  .scroll-wrapper{
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .canvas{
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2000px;
+    height: 900px;
+  }
+
+  .lines-layer{
+    position: absolute; top:0; left:0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .line-path{
+    stroke: var(--shadow-light);
+    stroke-width: 3;
+    fill: none;
+    stroke-linecap: round;
+  }
+  .flow-pulse{
+    fill: var(--brass);
+    filter: drop-shadow(0 0 6px rgba(205,168,91,0.85));
+    opacity: 0;
+  }
+
+  /* shared clay base */
+  .clay{
+    position: absolute;
+    transform: translate(-50%, -50%);
+    background: var(--raise);
+    box-shadow: 10px 10px 22px var(--shadow-dark), -8px -8px 18px var(--shadow-light);
+    z-index: 2;
+  }
+
+  .dot{
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--brass);
+    border: 5px solid var(--bg);
+    box-shadow: 3px 3px 8px var(--shadow-dark), -3px -3px 8px var(--shadow-light);
+    z-index: 3;
+  }
+
+  .plus-btn{
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text);
+    font-size: 20px;
+    font-family: var(--font-body);
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.06);
+    transition: transform 0.35s cubic-bezier(.175,.885,.32,1.275), box-shadow 0.3s ease, background 0.3s ease;
+    z-index: 4;
+  }
+  .plus-btn:hover, .plus-btn:focus-visible{
+    background: var(--brass-soft);
+    color: var(--brass);
+    transform: translate(-50%, -50%) scale(1.12);
+  }
+  .plus-btn:focus-visible{
+    outline: 2px solid var(--brass);
+    outline-offset: 3px;
+  }
+
+  /* step card */
+  .card{
+    width: 258px;
+    border-radius: 26px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.05);
+    cursor: pointer;
+    transition: transform 0.4s ease, box-shadow 0.4s ease;
+    text-align: left;
+    padding: 0;
+  }
+  .card:hover, .card:focus-visible{
+    transform: translate(-50%, -56%);
+    box-shadow: 16px 16px 30px var(--shadow-dark), -12px -12px 26px var(--shadow-light);
+    z-index: 10;
+  }
+  .card:focus-visible{ outline: 2px solid var(--brass); outline-offset: 4px; }
+  .card.is-trigger, .card.is-success{ border-color: var(--brass); }
+
+  .card-media{
+    position: relative;
+    height: 168px;
+    width: 100%;
+    overflow: hidden;
+    background: var(--bg-deep);
+  }
+  .card-media img{
+    width: 100%; height: 100%;
+    object-fit: cover;
+    position: absolute; top:0; left:0;
+    z-index: 1;
+    filter: saturate(0.85) contrast(1.05);
+  }
+  .card-media .tint{
+    position: absolute; inset: 0;
+    z-index: 2;
+    mix-blend-mode: multiply;
+    opacity: 0.6;
+  }
+  .card-media .tint::after{
+    content:"";
+    position:absolute; inset:0;
+    background: linear-gradient(180deg, rgba(13,21,16,0.1) 0%, rgba(13,21,16,0.75) 100%);
+  }
+
+  .card-top{
+    position: absolute; top: 12px; left: 12px; right: 12px;
+    z-index: 3;
+    display: flex; justify-content: space-between; align-items: flex-start;
+  }
+  .step-num{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--bg-deep);
+    background: var(--text);
+    padding: 3px 9px;
+    border-radius: 12px;
+  }
+  .card-icon{
+    font-size: 15px;
+    background: rgba(255,255,255,0.12);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 14px;
+    padding: 5px 9px;
+  }
+
+  .card-name{
+    position: absolute; bottom: 12px; left: 14px; right: 14px;
+    z-index: 3;
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.5);
+  }
+
+  .card-stats{
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 16px 14px;
+    background: var(--raise);
+  }
+  .stat{
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .stat .num{
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .stat .lbl{
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .trend{
+    align-self: flex-start;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+  .trend.pos{ color: var(--moss); background: rgba(127,174,111,0.14); }
+  .trend.neg{ color: var(--coral); background: rgba(226,114,91,0.14); }
+  .trend.flat{ color: var(--brass); background: var(--brass-soft); }
+
+  @media (prefers-reduced-motion: reduce){
+    .scroll-instruction, .plus-btn{ animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="scroll-instruction">→ scroll to trace the hierarchy</div>
+<div class="progress-rail"><div class="progress-fill"></div></div>
+
+<div class="scroll-wrapper">
+  <div class="canvas">
+
+    <svg class="lines-layer" viewBox="0 0 2000 900" preserveAspectRatio="none">
+      <path class="line-path" id="path-in" d="M 100 450 L 700 450" />
+      <path class="line-path" id="path-top" d="M 700 450 C 850 450, 850 220, 1060 220 C 1270 220, 1270 450, 1260 450" />
+      <path class="line-path" id="path-mid" d="M 700 450 L 1260 450" />
+      <path class="line-path" id="path-bottom" d="M 700 450 C 850 450, 850 680, 1060 680 C 1270 680, 1270 450, 1260 450" />
+      <path class="line-path" id="path-out" d="M 1260 450 L 1700 450" />
+
+      <circle class="flow-pulse" r="5" />
+      <circle class="flow-pulse" r="5" />
+      <circle class="flow-pulse" r="5" />
+      <circle class="flow-pulse" r="5" />
+      <circle class="flow-pulse" r="5" />
+    </svg>
+
+    <div class="clay dot gs-reveal" style="left:100px; top:450px;"></div>
+    <button class="clay plus-btn gs-reveal" style="left:240px; top:450px;" title="Add role">+</button>
+    <div class="clay dot gs-reveal" style="left:380px; top:450px;"></div>
+
+    <button class="clay card is-trigger gs-reveal" style="left:540px; top:450px;">
+      <div class="card-media">
+        <img src="https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=400&q=80" alt="">
+        <div class="tint" style="background:var(--brass);"></div>
+        <div class="card-top">
+          <span class="step-num">Level 1</span>
+          <span class="card-icon">🧑‍💼</span>
+        </div>
+        <div class="card-name">CEO</div>
+      </div>
+      <div class="card-stats">
+        <div class="stat"><span class="num">3</span><span class="lbl">Direct reports</span></div>
+        <div class="stat"><span class="num">142</span><span class="lbl">Total org</span></div>
+        <span class="trend flat">Top</span>
+      </div>
+    </button>
+
+    <div class="clay dot gs-reveal" style="left:700px; top:450px;"></div>
+
+    <button class="clay plus-btn gs-reveal" style="left:820px; top:280px;" title="Add role">+</button>
+    <button class="clay plus-btn gs-reveal" style="left:850px; top:450px;" title="Add role">+</button>
+    <button class="clay plus-btn gs-reveal" style="left:820px; top:620px;" title="Add role">+</button>
+
+    <div class="clay dot gs-reveal" style="left:900px; top:220px;"></div>
+    <button class="clay card gs-reveal" style="left:1060px; top:220px;">
+      <div class="card-media">
+        <img src="https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=400&q=80" alt="">
+        <div class="tint" style="background:var(--sky);"></div>
+        <div class="card-top">
+          <span class="step-num">Level 2</span>
+          <span class="card-icon">🛠️</span>
+        </div>
+        <div class="card-name">Engineering Manager</div>
+      </div>
+      <div class="card-stats">
+        <div class="stat"><span class="num">8</span><span class="lbl">Reports</span></div>
+        <div class="stat"><span class="num">34</span><span class="lbl">Team size</span></div>
+        <span class="trend flat">Eng</span>
+      </div>
+    </button>
+
+    <div class="clay dot gs-reveal" style="left:900px; top:450px;"></div>
+    <button class="clay card gs-reveal" style="left:1060px; top:450px;">
+      <div class="card-media">
+        <img src="https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&w=400&q=80" alt="">
+        <div class="tint" style="background:var(--plum);"></div>
+        <div class="card-top">
+          <span class="step-num">Level 2</span>
+          <span class="card-icon">📦</span>
+        </div>
+        <div class="card-name">Product Manager</div>
+      </div>
+      <div class="card-stats">
+        <div class="stat"><span class="num">5</span><span class="lbl">Reports</span></div>
+        <div class="stat"><span class="num">21</span><span class="lbl">Team size</span></div>
+        <span class="trend flat">Product</span>
+      </div>
+    </button>
+
+    <div class="clay dot gs-reveal" style="left:900px; top:680px;"></div>
+    <button class="clay card gs-reveal" style="left:1060px; top:680px;">
+      <div class="card-media">
+        <img src="https://images.unsplash.com/photo-1587355760421-b9de3226a046?auto=format&fit=crop&w=400&q=80" alt="">
+        <div class="tint" style="background:var(--coral);"></div>
+        <div class="card-top">
+          <span class="step-num">Level 2</span>
+          <span class="card-icon">🎨</span>
+        </div>
+        <div class="card-name">Design Manager</div>
+      </div>
+      <div class="card-stats">
+        <div class="stat"><span class="num">4</span><span class="lbl">Reports</span></div>
+        <div class="stat"><span class="num">14</span><span class="lbl">Team size</span></div>
+        <span class="trend flat">Design</span>
+      </div>
+    </button>
+
+    <div class="clay dot gs-reveal" style="left:1260px; top:450px;"></div>
+    <button class="clay plus-btn gs-reveal" style="left:1400px; top:450px;" title="Add role">+</button>
+    <div class="clay dot gs-reveal" style="left:1540px; top:450px;"></div>
+
+    <button class="clay card is-success gs-reveal" style="left:1700px; top:450px;">
+      <div class="card-media">
+        <img src="https://images.unsplash.com/photo-1600880292089-90a7e086ee0c?auto=format&fit=crop&w=400&q=80" alt="">
+        <div class="tint" style="background:var(--moss);"></div>
+        <div class="card-top">
+          <span class="step-num">Level 3</span>
+          <span class="card-icon">👩‍💻</span>
+        </div>
+        <div class="card-name">Developers &amp; ICs</div>
+      </div>
+      <div class="card-stats">
+        <div class="stat"><span class="num">69</span><span class="lbl">People</span></div>
+        <div class="stat"><span class="num">3</span><span class="lbl">Teams</span></div>
+        <span class="trend pos">Base</span>
+      </div>
+    </button>
+
+  </div>
+</div>
+
+<script>
+gsap.registerPlugin(ScrollTrigger, MotionPathPlugin);
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const canvas = document.querySelector(".canvas");
+let scrollMax = canvas.scrollWidth - window.innerWidth + 200;
+
+const horizontalTween = gsap.to(canvas, {
+  x: -scrollMax,
+  ease: "none",
+  scrollTrigger: {
+    trigger: ".scroll-wrapper",
+    pin: true,
+    scrub: 1,
+    end: () => "+=" + scrollMax,
+    onUpdate: (self) => {
+      gsap.set(".progress-fill", { scaleX: self.progress });
+    }
+  }
+});
+
+gsap.to(".scroll-instruction", {
+  opacity: 0,
+  y: 16,
+  scrollTrigger: {
+    trigger: "body",
+    start: "top -40",
+    end: "top -90",
+    scrub: true
+  }
+});
+
+// draw the pipe lines as they enter view, then release a traveling pulse
+const paths = gsap.utils.toArray(".line-path");
+const pulses = gsap.utils.toArray(".flow-pulse");
+
+paths.forEach((path, i) => {
+  const length = path.getTotalLength();
+  gsap.set(path, { strokeDasharray: length, strokeDashoffset: length });
+
+  gsap.to(path, {
+    strokeDashoffset: 0,
+    ease: "power2.inOut",
+    strokeWidth: 3.4,
+    scrollTrigger: {
+      trigger: path,
+      containerAnimation: horizontalTween,
+      start: "left right-=180",
+      end: "right center",
+      scrub: true,
+      onLeaveBack: () => gsap.set(pulses[i], { opacity: 0 }),
+      onEnter: () => {
+        if (reduceMotion) return;
+        gsap.set(pulses[i], { opacity: 1 });
+        gsap.to(pulses[i], {
+          motionPath: { path: path, align: path, alignOrigin: [0.5, 0.5] },
+          duration: 2.4,
+          ease: "sine.inOut",
+          repeat: -1
+        });
+      }
+    }
+  });
+});
+
+// pop-in reveal for nodes, buttons and cards
+gsap.utils.toArray(".gs-reveal").forEach((el) => {
+  const isPlus = el.classList.contains("plus-btn");
+  gsap.from(el, {
+    scale: 0,
+    opacity: 0,
+    rotation: isPlus ? -90 : 0,
+    duration: reduceMotion ? 0.01 : 0.8,
+    ease: "back.out(1.5)",
+    scrollTrigger: {
+      trigger: el,
+      containerAnimation: horizontalTween,
+      start: "left right-=140",
+      toggleActions: "play none none reverse"
+    }
+  });
+});
+
+window.addEventListener("resize", () => {
+  scrollMax = canvas.scrollWidth - window.innerWidth + 200;
+  ScrollTrigger.refresh();
+});
+</script>
+
+</body>
+</html>
