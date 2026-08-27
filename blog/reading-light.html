@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Reading Light</title>
+<style>
+  html, body {margin:0;background:#fff;font-family:Georgia,'Times New Roman',serif}
+  canvas {display:block;width:100%;height:100vh;position:fixed;pointer-events:none}
+  div {position:fixed;top:0;left:0;padding:1em;margin:1em}
+  h1 {font-size:2em}
+</style>
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@~0.184/build/three.webgpu.js",
+      "three/webgpu": "https://unpkg.com/three@~0.184/build/three.webgpu.js",
+      "three/addons/": "https://unpkg.com/three@~0.184/examples/jsm/",
+      "three/tsl": "https://unpkg.com/three@~0.184/build/three.tsl.js"
+    }
+  }
+</script>
+</head>
+<body>
+
+<div>
+<h1>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur faucibus velit et sapien cursus, ac lacinia lorem commodo. Praesent a libero tincidunt, posuere eros sit amet, rutrum augue. Vestibulum consequat, nisi condimentum consectetur aliquet, ipsum neque bibendum nisl, id bibendum orci enim venenatis arcu. Ut bibendum tincidunt ipsum, et dictum dui placerat et. Nullam vitae ipsum et lacus cursus tincidunt id a magna. Phasellus congue eu nisi eu rutrum. Maecenas laoreet, augue vitae suscipit euismod, justo nisi bibendum nisl, vitae fringilla lorem libero ac magna. Etiam sit amet risus ornare, tincidunt risus in, vestibulum ante. Etiam consequat imperdiet gravida. Mauris blandit eros vitae massa aliquam, non scelerisque augue consequat. Mauris mattis orci urna, in condimentum est dignissim ac. Sed interdum urna ex, quis feugiat nibh varius sed. Vestibulum id tincidunt lectus. Morbi finibus malesuada nunc, in sodales risus cursus ut.</h1>
+
+<h1>Integer in nisi vel sem dictum consequat non et metus. Sed aliquam nunc ut massa commodo consequat. In quis augue elementum, placerat felis et, mattis lectus. Nam at pellentesque elit, at tempor nulla. Maecenas consectetur semper odio, eget vulputate massa venenatis eu. Aenean eu leo pellentesque, commodo dui vitae, fringilla libero. Integer diam lorem, dapibus et lectus id, convallis rutrum tortor. Donec malesuada sed tortor at bibendum. Sed ut justo pretium, placerat ipsum finibus, consequat enim. Suspendisse varius sollicitudin tortor non tempus. Proin vel luctus felis. Sed in purus ullamcorper, ultricies lectus ac, lobortis nisi. Pellentesque tortor velit, tincidunt dignissim porta quis, tempus dapibus arcu. Suspendisse maximus lectus vitae aliquam hendrerit. Aliquam mollis pulvinar tellus eu dignissim. Integer varius consectetur libero, a lobortis nulla sollicitudin a.</h1>
+
+<h1>Aenean dui diam, feugiat ac pretium sodales, interdum in enim. Nam porta et libero nec interdum. Nullam eu tincidunt quam. Mauris sit amet interdum nibh. Vivamus mattis interdum ligula, at volutpat arcu feugiat at. Nam dolor arcu, pellentesque non risus et, consequat ullamcorper neque. Cras faucibus non diam vitae porttitor. Nunc ornare vestibulum urna.</h1>
+
+<h1>Proin laoreet felis sed massa sagittis lobortis. Nulla vel interdum odio, nec commodo mauris. Pellentesque malesuada ipsum lacus, non pellentesque massa pharetra sit amet. Nulla facilisi. Vestibulum mattis molestie elit, fermentum rutrum massa mattis ut. Suspendisse vel urna et massa vehicula pretium. Vivamus semper congue vehicula. Nunc posuere metus in dolor iaculis, sit amet semper tellus vestibulum. Aliquam dictum sapien vel ante suscipit, dignissim efficitur ipsum vehicula.</h1>
+
+<h1>Fusce auctor ante ante, eu tempor erat molestie at. Nam aliquet, turpis sit amet imperdiet dictum, nisi felis facilisis lectus, vitae posuere sapien nunc in eros. Praesent dictum velit ut risus hendrerit, efficitur pretium ligula faucibus. Curabitur vehicula tempor ultricies. Etiam eu nisl vestibulum, molestie libero at, vestibulum arcu. Duis tincidunt dolor nec sem tincidunt, at varius arcu cursus. Pellentesque et pulvinar metus. Aenean mattis dignissim ligula, nec condimentum dolor tincidunt eget. Aliquam consequat leo ut mi sodales, vitae hendrerit tellus scelerisque. Curabitur porttitor feugiat elementum. Pellentesque commodo sem ut semper sollicitudin. Morbi non ornare nibh, nec congue purus.</h1>
+
+<h1>Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since 1966, when designers at Letraset and James Mosley, the librarian at St Bride Printing Library in London, took a 1914 Cicero translation and scrambled it to make dummy text for Letraset's Body Type sheets. It has survived not only many decades, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised thanks to these sheets and more recently with desktop publishing software like Aldus PageMaker and Microsoft Word including versions of Lorem Ipsum.</h1>
+
+<h1>Why do we use it?</h1>
+
+<h1>It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution of letters, as opposed to using 'Content here, content here', making it look like readable English. Many desktop publishing packages and web page editors now use Lorem Ipsum as their default model text, and a search for 'lorem ipsum' will uncover many web sites still in their infancy. Various versions have evolved over the years, sometimes by accident, sometimes on purpose (injected humour and the like).</h1>
+
+<h1>Where does it come from?</h1>
+
+<h1>Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots in a piece of classical Latin literature from 45 BC, making it over 2000 years old. Richard McClintock, a Latin professor at Hampden-Sydney College in Virginia, looked up one of the more obscure Latin words, consectetur, from a Lorem Ipsum passage, and going through the cites of the word in classical literature, discovered the undoubtable source. Lorem Ipsum comes from sections 1.10.32 and 1.10.33 of "de Finibus Bonorum et Malorum" (The Extremes of Good and Evil) by Cicero, written in 45 BC. This book is a treatise on the theory of ethics, very popular during the Renaissance. The first line of Lorem Ipsum, "Lorem ipsum dolor sit amet..", comes from a line in section 1.10.32.</h1>
+
+<h1>The standard chunk of Lorem Ipsum used since 1966 is reproduced below for those interested. Sections 1.10.32 and 1.10.33 from "de Finibus Bonorum et Malorum" by Cicero are also reproduced in their exact original form, accompanied by English versions from the 1914 translation by H. Rackham.</h1>
+</div>
+
+<script type="module">
+import * as THREE from 'three/webgpu'
+import { TSL as T } from 'three/webgpu'
+import { RectAreaLightTexturesLib } from 'three/addons/lights/RectAreaLightTexturesLib.js'
+import { RectAreaLightHelper } from 'three/addons/helpers/RectAreaLightHelper.js'
+
+THREE.RectAreaLightNode.setLTC(RectAreaLightTexturesLib.init())
+
+const renderer = await new THREE.WebGPURenderer().init()
+const scene = new THREE.Scene()
+const camera = new THREE.PerspectiveCamera()
+camera.position.set(0, 0, 2)
+
+const pageSurfaceMaterial = new THREE.MeshPhysicalNodeMaterial({})
+const pageSurface = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), pageSurfaceMaterial)
+scene.add(pageSurface)
+
+const READING_LIGHT_SPAN = 0.777
+const readingLight = new THREE.RectAreaLight('white', 0, READING_LIGHT_SPAN, 0)
+scene.add(readingLight)
+scene.add(new RectAreaLightHelper(readingLight))
+
+const renderPipeline = new THREE.RenderPipeline(renderer)
+const scenePass = T.pass(scene, camera)
+renderPipeline.outputNode = T.vec4(
+  scenePass.rgb,
+  T.mx_rgbtohsv(scenePass.rgb).z.oneMinus()
+    .pow(20)    // vignette falloff — higher = sharper edge between lit and dark
+    .mul(0.98)  // vignette strength, 0..1 — higher = darker unlit page
+)
+
+renderer.setAnimationLoop(() => renderPipeline.render())
+document.body.appendChild(renderer.domElement) // on top of the text, so its alpha masks it
+
+const READING_LIGHT_MIN_HEIGHT = 0.3
+const READING_LIGHT_MAX_HEIGHT = 0.5
+const READING_LIGHT_MIN_RADIUS = 0.3
+const READING_LIGHT_MIN_INTENSITY = 1.5
+const READING_LIGHT_MAX_INTENSITY = 3.5
+
+const raycaster = new THREE.Raycaster()
+function sweepReadingLight(nx, ny) { // nx, ny in [-1, 1]
+  raycaster.setFromCamera(new THREE.Vector2(nx, ny), camera)
+  const intersections = raycaster.intersectObject(pageSurface)
+  for (const hit of intersections) {
+    if (hit.object !== pageSurface) continue
+    const bearing = -Math.atan2(hit.point.y, hit.point.x) + Math.PI / 2
+    const throwDistance = Math.max(READING_LIGHT_MIN_RADIUS, Math.hypot(hit.point.x, hit.point.y)) + 0.2
+    readingLight.position.set(
+      throwDistance * Math.sin(bearing),
+      throwDistance * Math.cos(bearing),
+      readingLight.width / 2
+    )
+    readingLight.lookAt(0, 0, readingLight.width / 2)
+    readingLight.height = Math.min(READING_LIGHT_MAX_HEIGHT, Math.max(READING_LIGHT_MIN_HEIGHT, Math.hypot(nx, ny)))
+    readingLight.intensity = READING_LIGHT_MIN_INTENSITY + Math.min(READING_LIGHT_MAX_INTENSITY - READING_LIGHT_MIN_INTENSITY, Math.hypot(nx, ny))
+  }
+}
+
+document.body.addEventListener('pointermove', (e) => {
+  const s = getComputedStyle(renderer.domElement)
+  const x = (e.clientX / parseInt(s.width)) * 2 - 1
+  const y = (1 - e.clientY / parseInt(s.height)) * 2 - 1
+  sweepReadingLight(x, y)
+})
+
+function tuneReadingLightColor() {
+  const s = getComputedStyle(renderer.domElement)
+  const progress = Math.min(1, scrollY / (document.body.scrollHeight - parseFloat(s.height)))
+  readingLight.color.setHSL(progress, 0.5, 0.5)
+}
+addEventListener('scroll', () => tuneReadingLightColor())
+
+setTimeout(() => {
+  sweepReadingLight(0.2, -0.2)
+  tuneReadingLightColor()
+}, 150)
+
+addEventListener('resize', () => {
+  const { width, height } = renderer.domElement.getBoundingClientRect()
+  renderer.setPixelRatio(devicePixelRatio)
+  renderer.setSize(width, height, false)
+  camera.aspect = width / height
+  camera.updateProjectionMatrix()
+})
+dispatchEvent(new Event('resize'))
+</script>
+</body>
+</html>
