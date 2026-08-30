@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Liquid Buttons</title>
+<style>
+  :root{
+    --bg: #eceae6;
+  }
+  *{ box-sizing: border-box; }
+  html,body{
+    width:100%;
+    height:100%;
+    margin:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background: radial-gradient(120% 120% at 30% 20%, #f4f2ee 0%, #dedad4 60%, #cfccc6 100%);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    perspective: 1600px;
+  }
+
+  .stage{
+    transform: rotateX(48deg) rotateZ(-38deg);
+  }
+
+  .board{
+    display:flex;
+    flex-direction:column;
+    gap: 22px;
+    padding: 34px;
+  }
+
+  .liquid-btn{
+    --tint: 255,255,255;
+    --tint-strong: 255,255,255;
+    --glow: transparent;
+    position:relative;
+    width: 300px;
+    height: 92px;
+    border-radius: 46px;
+    cursor:pointer;
+    z-index: 1;
+    border:none;
+    outline:none;
+    display:flex;
+    align-items:center;
+    padding: 0 30px;
+    color: #16171a;
+    font-size: 17px;
+    font-weight: 500;
+    letter-spacing: 0.1px;
+    text-align:left;
+    transition: transform .25s cubic-bezier(.2,.9,.3,1.3), box-shadow .3s ease, background .3s ease;
+
+    /* base glass look */
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(var(--tint),0.55) 45%, rgba(var(--tint-strong),0.85) 100%);
+    box-shadow:
+      0 2px 0 rgba(255,255,255,0.9) inset,
+      0 -18px 26px -14px rgba(0,0,0,0.18) inset,
+      0 14px 0 -6px rgba(0,0,0,0.05),
+      0 26px 40px -14px rgba(20,20,25,0.35),
+      0 2px 4px rgba(20,20,25,0.15);
+  }
+
+  .liquid-btn::before{
+    /* top specular streak */
+    content:"";
+    position:absolute;
+    top: 6px; left: 18px; right: 40%;
+    height: 30%;
+    border-radius: 40px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0));
+    filter: blur(1px);
+    pointer-events:none;
+  }
+
+  .liquid-btn::after{
+    /* thin rim light */
+    content:"";
+    position:absolute;
+    inset:0;
+    border-radius: 46px;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.6) inset;
+    pointer-events:none;
+  }
+
+  .liquid-btn .icon{
+    width: 26px;
+    height: 26px;
+    margin-right: 16px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .liquid-btn .icon svg{ width:100%; height:100%; display:block; fill: currentColor; }
+
+  .liquid-btn .label{
+    text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+  }
+
+  .liquid-btn.dark{ color:#f2f2f2; }
+
+  /* glow ring shown when a liquid button is hovered */
+  .liquid-btn .glow-ring{
+    position:absolute;
+    inset:-3px;
+    border-radius: 48px;
+    background: var(--glow);
+    filter: blur(10px);
+    opacity:0;
+    transition: opacity .3s ease;
+    z-index:-1;
+  }
+
+  .liquid-btn:hover .glow-ring{ opacity: .9; }
+
+  .liquid-btn:hover{
+    transform: translateY(-4px) scale(1.015);
+    z-index: 5;
+  }
+
+  /* color variants (applied via data-color) */
+  .liquid-btn[data-color="orange"]:hover{
+    --tint: 255,196,120;
+    --tint-strong: 255,158,53;
+    --glow: rgba(255,150,40,0.55);
+    box-shadow:
+      0 2px 0 rgba(255,255,255,0.6) inset,
+      0 -18px 30px -12px rgba(140,70,0,0.45) inset,
+      0 26px 44px -12px rgba(190,100,10,0.55),
+      0 2px 4px rgba(120,60,0,0.3);
+  }
+
+  .liquid-btn[data-color="red"]:hover{
+    --tint: 255,110,100;
+    --tint-strong: 224,40,35;
+    --glow: rgba(230,40,35,0.6);
+    color:#fff;
+    box-shadow:
+      0 2px 0 rgba(255,255,255,0.35) inset,
+      0 -18px 30px -12px rgba(90,0,0,0.55) inset,
+      0 26px 44px -12px rgba(180,20,20,0.6),
+      0 2px 4px rgba(90,0,0,0.35);
+  }
+
+  .liquid-btn[data-color="blue"]:hover{
+    --tint: 150,200,255;
+    --tint-strong: 70,140,255;
+    --glow: rgba(70,140,255,0.55);
+    box-shadow:
+      0 2px 0 rgba(255,255,255,0.7) inset,
+      0 -18px 30px -12px rgba(20,60,140,0.4) inset,
+      0 26px 44px -12px rgba(60,110,220,0.5),
+      0 2px 4px rgba(20,60,140,0.25);
+  }
+
+  .cursor{
+    position:absolute;
+    width: 34px;
+    filter: drop-shadow(0 3px 4px rgba(0,0,0,0.35));
+    transform: translateZ(20px);
+    pointer-events:none;
+    transition: top .25s ease, right .25s ease;
+  }
+
+  /* dark stage variant */
+  .stage-wrap.dark-mode{
+    background: transparent;
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="board" id="board">
+
+    <button class="liquid-btn" data-color="orange" data-label="Sleep">
+      <span class="glow-ring"></span>
+      <span class="icon">
+        <svg viewBox="0 0 24 24"><path d="M3 18h1v-2a2 2 0 0 1 2-2h1V9a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v5h1a2 2 0 0 1 2 2v2h1v1H3zM8 9v5h8V9a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1z"/></svg>
+      </span>
+      <span class="label">Sleep</span>
+    </button>
+
+    <button class="liquid-btn" data-color="red" data-label="Do Not Disturb">
+      <span class="glow-ring"></span>
+      <span class="icon">
+        <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 8.66 15c-.55.08-1.1.13-1.66.13a9 9 0 0 1-9-9c0-3.1 1.5-5.86 3.82-7.6A9.95 9.95 0 0 0 12 2z"/></svg>
+      </span>
+      <span class="label">Do Not Disturb</span>
+    </button>
+
+    <button class="liquid-btn" data-color="blue" data-label="Personal">
+      <span class="glow-ring"></span>
+      <span class="icon">
+        <svg viewBox="0 0 24 24"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4 0-9 2-9 5v2h18v-2c0-3-5-5-9-5z"/></svg>
+      </span>
+      <span class="label">Personal</span>
+    </button>
+
+  </div>
+</div>
+
+</body>
+</html>
