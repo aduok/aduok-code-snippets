@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>wiggle icons</title>
+<link href="https://fonts.googleapis.com/css2?family=Gochi+Hand&family=Noto+Emoji:wght@300..700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    margin: 0;
+    padding: 60px 32px;
+    background: #f3ede1;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-content: center;
+    gap: clamp(18px, 3vw, 40px);
+  }
+
+  svg.defs { position: absolute; width: 0; height: 0; }
+
+  .icon {
+    font-family: "Noto Emoji", sans-serif;
+    font-size: clamp(44px, 6vw, 68px);
+    line-height: 1;
+    display: inline-block;
+    filter: drop-shadow(2px 3px 2px #00000025);
+  }
+
+  /* each icon gets its own wobble filter + a slightly different
+     duration/seed range so the whole group doesn't wiggle in sync */
+  .compass  { color: #b5542b; filter: url('#wobble-a') drop-shadow(2px 3px 2px #00000025); }
+  .leaf     { color: #2b4a42; filter: url('#wobble-b') drop-shadow(2px 3px 2px #00000025); }
+  .sun      { color: #d9a441; filter: url('#wobble-c') drop-shadow(2px 3px 2px #00000025); }
+  .bird     { color: #6b7fb0; filter: url('#wobble-a') drop-shadow(2px 3px 2px #00000025); }
+  .bloom    { color: #cf7d9c; filter: url('#wobble-b') drop-shadow(2px 3px 2px #00000025); }
+  .berry    { color: #a83a3a; filter: url('#wobble-c') drop-shadow(2px 3px 2px #00000025); }
+  .bee      { color: #d99b1f; filter: url('#wobble-a') drop-shadow(2px 3px 2px #00000025); }
+  .snail    { color: #8576e4; filter: url('#wobble-b') drop-shadow(2px 3px 2px #00000025); }
+  .mush     { color: #c65b3a; filter: url('#wobble-c') drop-shadow(2px 3px 2px #00000025); }
+  .cloud    { color: #7c93b3; filter: url('#wobble-a') drop-shadow(2px 3px 2px #00000025); }
+  .butter   { color: #4f9c6b; filter: url('#wobble-b') drop-shadow(2px 3px 2px #00000025); }
+  .star     { color: #e0b23e; filter: url('#wobble-c') drop-shadow(2px 3px 2px #00000025); }
+  .heart    { color: #d9636e; filter: url('#wobble-a') drop-shadow(2px 3px 2px #00000025); }
+  .cake     { color: #cf7d9c; filter: url('#wobble-b') drop-shadow(2px 3px 2px #00000025); }
+  .wizard   { color: #6b7fb0; filter: url('#wobble-c') drop-shadow(2px 3px 2px #00000025); }
+  .wand     { color: #8576e4; filter: url('#wobble-a') drop-shadow(2px 3px 2px #00000025); }
+  .sparkle  { color: #d9a441; filter: url('#wobble-b') drop-shadow(2px 3px 2px #00000025); }
+  .rainbow  { color: #4f9c6b; filter: url('#wobble-c') drop-shadow(2px 3px 2px #00000025); }
+  .candy    { color: #a83a3a; filter: url('#wobble-a') drop-shadow(2px 3px 2px #00000025); }
+  .donut    { color: #c65b3a; filter: url('#wobble-b') drop-shadow(2px 3px 2px #00000025); }
+</style>
+</head>
+<body>
+
+  <svg class="defs">
+    <filter id="wobble-a" x="-30%" y="-30%" width="160%" height="160%">
+      <feTurbulence type="turbulence" baseFrequency="0.035" numOctaves="2" seed="2" result="n">
+        <animate attributeName="seed" values="2;7;13;2" dur="4.5s" calcMode="discrete" repeatCount="indefinite" />
+      </feTurbulence>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="4.5" xChannelSelector="R" yChannelSelector="G" />
+    </filter>
+    <filter id="wobble-b" x="-30%" y="-30%" width="160%" height="160%">
+      <feTurbulence type="turbulence" baseFrequency="0.035" numOctaves="2" seed="5" result="n">
+        <animate attributeName="seed" values="5;11;18;5" dur="5.2s" calcMode="discrete" repeatCount="indefinite" />
+      </feTurbulence>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="4.5" xChannelSelector="R" yChannelSelector="G" />
+    </filter>
+    <filter id="wobble-c" x="-30%" y="-30%" width="160%" height="160%">
+      <feTurbulence type="turbulence" baseFrequency="0.035" numOctaves="2" seed="9" result="n">
+        <animate attributeName="seed" values="9;3;16;9" dur="3.8s" calcMode="discrete" repeatCount="indefinite" />
+      </feTurbulence>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="4.5" xChannelSelector="R" yChannelSelector="G" />
+    </filter>
+  </svg>
+
+  <span class="icon compass">🧭</span>
+  <span class="icon leaf">🍃</span>
+  <span class="icon sun">🌤️</span>
+  <span class="icon bird">🕊️</span>
+  <span class="icon bloom">🌸</span>
+  <span class="icon berry">🍓</span>
+  <span class="icon bee">🐝</span>
+  <span class="icon snail">🐌</span>
+  <span class="icon mush">🍄</span>
+  <span class="icon cloud">☁️</span>
+  <span class="icon butter">🦋</span>
+  <span class="icon star">⭐</span>
+  <span class="icon heart">💛</span>
+  <span class="icon cake">🍰</span>
+  <span class="icon wizard">🧙</span>
+  <span class="icon wand">🪄</span>
+  <span class="icon sparkle">✨</span>
+  <span class="icon rainbow">🌈</span>
+  <span class="icon candy">🍬</span>
+  <span class="icon donut">🍩</span>
+
+</body>
+</html>
