@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Clockwork Spider</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0b1a1d;
+    --verdigris: #1d4a47;
+    --brass: #d9a441;
+    --brass-deep: #8a6420;
+    --bone: #f1e8d4;
+    --ember: #e8643a;
+    --face-font: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  *, *::before, *::after { box-sizing: inherit; }
+
+  html { height: 100%; scroll-padding-top: env(safe-area-inset-top, 0px); }
+
+  body {
+    height: 100%;
+    margin: 0;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    color: var(--bone);
+    background: radial-gradient(circle at 50% 45%, var(--verdigris) 0%, var(--ink) 75%);
+  }
+
+  /* The silk thread the spider hangs from */
+  .thread {
+    position: fixed;
+    inset: 0 auto auto 50%;
+    width: 1.5px;
+    height: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(to bottom, transparent, rgb(241 232 212 / .65));
+    pointer-events: none;
+    opacity: 0;
+    animation: drop 1.4s cubic-bezier(.2, .8, .2, 1) .2s forwards;
+    transform-origin: top;
+  }
+  @keyframes drop { from { opacity: 0; transform: translateX(-50%) scaleY(0); } to { opacity: 1; transform: translateX(-50%) scaleY(1); } }
+
+  .clock {
+    width: min(92vmin, 760px);
+    aspect-ratio: 1;
+    overflow: visible;
+    z-index: 1;
+  }
+
+  /* Static cog fills, drawn by JS */
+  .cog-shape { fill: var(--brass); }
+  .cog-rim   { fill: none; stroke: var(--ink); stroke-width: 2; opacity: .55; }
+  .cog-hub   { fill: var(--ink); }
+
+  .numeral {
+    font-family: var(--face-font);
+    font-weight: 700;
+    font-size: 30px;
+    fill: var(--bone);
+    text-anchor: middle;
+    dominant-baseline: central;
+  }
+  .tick-minor { stroke: var(--bone); stroke-width: 1; opacity: .35; }
+  .tick-major { stroke: var(--brass); stroke-width: 2.5; stroke-linecap: round; }
+
+  .hand-hour, .hand-minute { fill: var(--bone); }
+  .hand-second { fill: var(--ember); }
+  .hand-joint  { fill: var(--ink); stroke: var(--brass); stroke-width: 1.5; }
+  .spider-body { fill: var(--bone); }
+  .spider-leg  { fill: none; stroke: var(--bone); stroke-width: 2.2; stroke-linecap: round; }
+  .spider-eye  { fill: var(--ink); }
+
+  .glow { filter: drop-shadow(0 0 3px rgb(217 164 65 / .85)); }
+
+  .legs { transform-origin: 0 0; animation: skitter 4s ease-in-out infinite; }
+  @keyframes skitter {
+    0%, 82%, 100% { transform: scale(1); }
+    88% { transform: scale(1.09, .95); }
+    94% { transform: scale(.97, 1.04); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .thread { animation: none; opacity: 1; }
+    .legs { animation: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="thread" aria-hidden="true"></div>
+
+  <svg class="clock" viewBox="0 0 400 400" role="img" aria-label="Analog clock showing the current time, with a spider whose legs act as the hands">
+    <g id="cogs" aria-hidden="true"></g>
+    <g id="dial" aria-hidden="true"></g>
+
+    <g id="hour-hand"   class="glow"><path class="hand-hour"   d="M0 14 L-6 0 Q-9 -30 -4 -66 L0 -84 L4 -66 Q9 -30 6 0 Z"/><circle class="hand-joint" cy="-32" r="4.5"/></g>
+    <g id="minute-hand" class="glow"><path class="hand-minute" d="M0 16 L-4.5 0 Q-6 -50 -2.5 -112 L0 -134 L2.5 -112 Q6 -50 4.5 0 Z"/><circle class="hand-joint" cy="-52" r="4"/></g>
+    <g id="second-hand" class="glow"><path class="hand-second" d="M-1.2 34 L-1.2 -150 L0 -158 L1.2 -150 L1.2 34 Z"/><circle class="hand-second" cy="26" r="6"/><circle class="hand-joint" cy="-92" r="3"/></g>
+
+    <g id="spider"></g>
+  </svg>
+
+<script>
+(() => {
+  "use strict";
+
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  const CENTER = 200;
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const $ = (selector) => document.querySelector(selector);
+  const make = (tag, attrs = {}, parent) => {
+    const el = document.createElementNS(SVG_NS, tag);
+    for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, value);
+    if (parent) parent.appendChild(el);
+    return el;
+  };
+  const polar = (radius, degrees) => {
+    const rad = (degrees - 90) * Math.PI / 180;
+    return [CENTER + radius * Math.cos(rad), CENTER + radius * Math.sin(rad)];
+  };
+
+  /* ---------- Easing ---------- */
+  const easeOutBack = (t) => {
+    const c1 = 2.2, c3 = c1 + 1;
+    return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+  };
+
+  /* ---------- Cogs ---------- */
+  function toothedPath(teeth, outer, root) {
+    const pitch = 360 / teeth;
+    const pts = [];
+    for (let i = 0; i < teeth; i++) {
+      const a = i * pitch;
+      pts.push([root, a], [outer, a + pitch * 0.2], [outer, a + pitch * 0.5], [root, a + pitch * 0.7]);
+    }
+    return pts.map(([r, a], i) => {
+      const x = r * Math.cos(a * Math.PI / 180);
+      const y = r * Math.sin(a * Math.PI / 180);
+      return `${i ? "L" : "M"}${x.toFixed(2)} ${y.toFixed(2)}`;
+    }).join(" ") + " Z";
+  }
+
+  // Each cog turns one tooth-step per second, alternating direction so neighbours appear to mesh.
+  const COGS = [
+    { x:  60, y:  70, teeth: 24, r: 62, dir:  1, opacity: .34, blur: 0 },
+    { x: 330, y:  80, teeth: 16, r: 44, dir: -1, opacity: .36, blur: 0 },
+    { x: 350, y: 330, teeth: 28, r: 74, dir:  1, opacity: .30, blur: 0 },
+    { x:  45, y: 335, teeth: 18, r: 50, dir: -1, opacity: .34, blur: 0 },
+    { x: 200, y:  -5, teeth: 20, r: 60, dir: -1, opacity: .18, blur: 1.2 },
+    { x:-40,  y: 200, teeth: 30, r: 120, dir: -1, opacity: .10, blur: 2.4 },
+    { x: 440, y: 190, teeth: 26, r: 130, dir:  1, opacity: .10, blur: 2.4 },
+  ];
+
+  const cogLayer = $("#cogs");
+  const defs = make("defs", {}, cogLayer);
+  const cogNodes = COGS.map((cog, index) => {
+    const group = make("g", { transform: `translate(${cog.x} ${cog.y})`, opacity: cog.opacity }, cogLayer);
+    if (cog.blur) {
+      const id = `blur-${index}`;
+      const filter = make("filter", { id, x: "-20%", y: "-20%", width: "140%", height: "140%" }, defs);
+      make("feGaussianBlur", { stdDeviation: cog.blur }, filter);
+      group.setAttribute("filter", `url(#${id})`);
+    }
+    const spinner = make("g", {}, group);
+    const root = cog.r * 0.86;
+    make("path", { class: "cog-shape", d: toothedPath(cog.teeth, cog.r, root) }, spinner);
+    make("circle", { class: "cog-rim", r: root * 0.72 }, spinner);
+    for (let i = 0; i < 5; i++) {
+      const [sx, sy] = [Math.cos(i * 72 * Math.PI / 180), Math.sin(i * 72 * Math.PI / 180)];
+      make("line", { x1: 0, y1: 0, x2: sx * root * 0.72, y2: sy * root * 0.72, stroke: "var(--ink)", "stroke-width": 3, opacity: .45 }, spinner);
+    }
+    make("circle", { class: "cog-hub", r: cog.r * 0.14 }, spinner);
+    return { spinner, step: 360 / cog.teeth, dir: cog.dir };
+  });
+
+  /* ---------- Dial ---------- */
+  const dial = $("#dial");
+  make("circle", { cx: CENTER, cy: CENTER, r: 186, fill: "none", stroke: "var(--brass)", "stroke-width": 1, opacity: .45 }, dial);
+
+  for (let i = 0; i < 60; i++) {
+    const major = i % 5 === 0;
+    const [x1, y1] = polar(major ? 168 : 174, i * 6);
+    const [x2, y2] = polar(182, i * 6);
+    make("line", { class: major ? "tick-major" : "tick-minor", x1, y1, x2, y2 }, dial);
+  }
+
+  for (let n = 1; n <= 12; n++) {
+    const [x, y] = polar(146, n * 30);
+    const label = make("text", { class: "numeral", x, y }, dial);
+    label.textContent = n;
+  }
+
+  /* ---------- Spider (legs, body) ---------- */
+  const spider = $("#spider");
+  const legAnchor = make("g", { transform: `translate(${CENTER} ${CENTER})` }, spider);
+  const legs = make("g", { class: "legs" }, legAnchor);
+  // Right-side legs as [knee, foot]; the left side mirrors them.
+  const LEGS = [
+    [[18, -26], [36, -14]],
+    [[24, -12], [44, 0]],
+    [[24, 2],   [42, 16]],
+    [[16, 10],  [30, 28]],
+  ];
+  for (const side of [-1, 1]) {
+    for (const [knee, foot] of LEGS) {
+      make("path", {
+        class: "spider-leg",
+        "stroke-linejoin": "round",
+        d: `M0 2 L${side * knee[0]} ${knee[1]} L${side * foot[0]} ${foot[1]}`,
+      }, legs);
+    }
+  }
+  make("ellipse", { class: "spider-body", cx: CENTER, cy: CENTER + 9, rx: 8, ry: 10 }, spider);
+  make("ellipse", { class: "spider-body", cx: CENTER, cy: CENTER - 4, rx: 6, ry: 6 }, spider);
+  make("circle", { class: "spider-eye", cx: CENTER - 2.4, cy: CENTER - 5.5, r: 1.3 }, spider);
+  make("circle", { class: "spider-eye", cx: CENTER + 2.4, cy: CENTER - 5.5, r: 1.3 }, spider);
+  make("circle", { fill: "var(--brass)", cx: CENTER, cy: CENTER + 10, r: 2.4 }, spider);
+
+  /* ---------- Hands ---------- */
+  const hands = {
+    hour: $("#hour-hand"),
+    minute: $("#minute-hand"),
+    second: $("#second-hand"),
+  };
+  const setAngle = (node, degrees) => node.setAttribute("transform", `translate(${CENTER} ${CENTER}) rotate(${degrees})`);
+
+  /* ---------- Render loop ---------- */
+  function render() {
+    const now = new Date();
+    const ms = now.getMilliseconds();
+    const seconds = now.getSeconds();
+    const minutes = now.getMinutes();
+    const hours = now.getHours() % 12;
+
+    // Ticking motion: a quick spring at the start of each second, then rest.
+    const phase = Math.min(ms / 450, 1);
+    const tick = reducedMotion ? (ms > 0 ? 1 : 0) : easeOutBack(phase);
+    const wholeSeconds = Math.floor(now.getTime() / 1000);
+
+    setAngle(hands.second, (seconds + tick) * 6);
+    setAngle(hands.minute, (minutes + (seconds + ms / 1000) / 60) * 6);
+    setAngle(hands.hour, (hours + minutes / 60) * 30);
+
+    for (const cog of cogNodes) {
+      const turn = ((wholeSeconds + tick) * cog.step * cog.dir) % 360;
+      cog.spinner.setAttribute("transform", `rotate(${turn.toFixed(3)})`);
+    }
+
+    requestAnimationFrame(render);
+  }
+
+  requestAnimationFrame(render);
+})();
+</script>
+</body>
+</html>
