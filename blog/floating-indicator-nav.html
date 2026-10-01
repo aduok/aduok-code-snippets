@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Floating Indicator Nav</title>
+
+  <style>
+    /* ------------------------------------------------------------------
+       Design tokens
+    ------------------------------------------------------------------ */
+    :root {
+      --color-page: #1e2028;
+      --color-nav: #ffffff;
+      --color-icon: #1e2028;
+      --color-icon-active: #ffffff;
+      --color-accent: #ff6b4a;
+      --color-focus: #3b82f6;
+
+      --item-size: clamp(3rem, 16vw, 4.5rem);
+      --nav-radius: 0.75rem;
+      --ring-width: 6px;
+      --curve-size: 1.25rem;
+
+      /* The edge curves reach past the circle, so the bar needs enough
+         side padding to contain them plus its own rounded corners. */
+      --nav-padding-x: calc(var(--curve-size) + var(--nav-radius));
+
+      --lift: calc(var(--item-size) * -0.45);
+      --duration: 500ms;
+      --ease: cubic-bezier(0.34, 1.3, 0.64, 1);
+    }
+
+    /* ------------------------------------------------------------------
+       Base
+    ------------------------------------------------------------------ */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: var(--color-page);
+    }
+
+    /* ------------------------------------------------------------------
+       Nav bar
+    ------------------------------------------------------------------ */
+    .nav {
+      --active-index: 0; /* updated by JS */
+
+      position: relative;
+      height: var(--item-size);
+      padding-inline: var(--nav-padding-x);
+      background: var(--color-nav);
+      border-radius: var(--nav-radius);
+    }
+
+    .nav__list {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: var(--item-size);
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .nav__link {
+      position: relative;
+      z-index: 1; /* keeps icons above the indicator */
+      display: grid;
+      place-items: center;
+      height: var(--item-size);
+      color: var(--color-icon);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .nav__link:focus-visible {
+      outline: 2px solid var(--color-focus);
+      outline-offset: -6px;
+      border-radius: var(--nav-radius);
+    }
+
+    .nav__icon {
+      width: 1.6rem;
+      height: 1.6rem;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition:
+        transform var(--duration) var(--ease),
+        color var(--duration) ease;
+    }
+
+    .nav__link[aria-current="page"] {
+      color: var(--color-icon-active);
+    }
+
+    .nav__link[aria-current="page"] .nav__icon {
+      transform: translateY(var(--lift));
+    }
+
+    /* ------------------------------------------------------------------
+       Floating indicator
+       Position is driven entirely by --active-index, so adding or
+       removing items needs no extra CSS.
+    ------------------------------------------------------------------ */
+    .nav__indicator {
+      position: absolute;
+      top: calc(var(--item-size) * -0.5);
+      left: var(--nav-padding-x);
+      width: var(--item-size);
+      height: var(--item-size);
+      background: var(--color-accent);
+      border: var(--ring-width) solid var(--color-page);
+      border-radius: 50%;
+      pointer-events: none;
+      transform: translateX(calc(var(--active-index) * 100%));
+      transition: transform var(--duration) var(--ease);
+    }
+
+    /* Inverted corners that blend the circle into the bar */
+    .nav__indicator::before,
+    .nav__indicator::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      width: var(--curve-size);
+      height: var(--curve-size);
+    }
+
+    .nav__indicator::before {
+      left: calc(var(--curve-size) * -1 - 2px);
+      border-top-right-radius: var(--curve-size);
+      box-shadow: 1px calc(var(--curve-size) / -2) 0 0 var(--color-page);
+    }
+
+    .nav__indicator::after {
+      right: calc(var(--curve-size) * -1 - 2px);
+      border-top-left-radius: var(--curve-size);
+      box-shadow: -1px calc(var(--curve-size) / -2) 0 0 var(--color-page);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .nav__icon,
+      .nav__indicator {
+        transition-duration: 0.01ms;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- SVG sprite: no external icon library needed -->
+  <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+    <symbol id="icon-home" viewBox="0 0 24 24">
+      <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
+    </symbol>
+    <symbol id="icon-profile" viewBox="0 0 24 24">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21a8 8 0 0 1 16 0" />
+    </symbol>
+    <symbol id="icon-message" viewBox="0 0 24 24">
+      <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z" />
+    </symbol>
+    <symbol id="icon-photos" viewBox="0 0 24 24">
+      <path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" />
+      <circle cx="12" cy="13" r="3.5" />
+    </symbol>
+    <symbol id="icon-settings" viewBox="0 0 24 24">
+      <path d="M4 7h10M18 7h2M4 17h2M10 17h10" />
+      <circle cx="16" cy="7" r="2" />
+      <circle cx="8" cy="17" r="2" />
+    </symbol>
+  </svg>
+
+  <nav class="nav" aria-label="Main">
+    <ul class="nav__list">
+      <li>
+        <a class="nav__link" href="#home" aria-label="Home" aria-current="page">
+          <svg class="nav__icon" aria-hidden="true"><use href="#icon-home" /></svg>
+        </a>
+      </li>
+      <li>
+        <a class="nav__link" href="#profile" aria-label="Profile">
+          <svg class="nav__icon" aria-hidden="true"><use href="#icon-profile" /></svg>
+        </a>
+      </li>
+      <li>
+        <a class="nav__link" href="#messages" aria-label="Messages">
+          <svg class="nav__icon" aria-hidden="true"><use href="#icon-message" /></svg>
+        </a>
+      </li>
+      <li>
+        <a class="nav__link" href="#photos" aria-label="Photos">
+          <svg class="nav__icon" aria-hidden="true"><use href="#icon-photos" /></svg>
+        </a>
+      </li>
+      <li>
+        <a class="nav__link" href="#settings" aria-label="Settings">
+          <svg class="nav__icon" aria-hidden="true"><use href="#icon-settings" /></svg>
+        </a>
+      </li>
+    </ul>
+
+    <span class="nav__indicator" aria-hidden="true"></span>
+  </nav>
+
+  <script>
+    (() => {
+      const nav = document.querySelector(".nav");
+      if (!nav) return;
+
+      const links = [...nav.querySelectorAll(".nav__link")];
+
+      const setCurrent = (link) => {
+        links.forEach((item) => {
+          item === link
+            ? item.setAttribute("aria-current", "page")
+            : item.removeAttribute("aria-current");
+        });
+        nav.style.setProperty("--active-index", links.indexOf(link));
+      };
+
+      // Sync the indicator with whichever link is marked current on load.
+      setCurrent(links.find((link) => link.hasAttribute("aria-current")) ?? links[0]);
+
+      nav.addEventListener("click", (event) => {
+        const link = event.target.closest(".nav__link");
+        if (!link) return;
+
+        event.preventDefault(); // Demo only: remove when using real routes.
+        setCurrent(link);
+      });
+    })();
+  </script>
+</body>
+</html>
