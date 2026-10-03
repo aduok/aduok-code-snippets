@@ -1,0 +1,489 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Ticket Printer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Layout: a gold ticket machine pinned to the top of a pale stage; the receipt feeds out of its slot, gets confetti, then tears on click. */
+:root {
+  --ground: #eef0fb;
+  --ground-glow: #f7f8ff;
+  --ink: #1d1e33;
+  --muted: #8588a3;
+  --accent: #5b5bd6;
+  --accent-ink: #ffffff;
+
+  /* the paper itself stays paper-coloured in both themes */
+  --paper: #ffffff;
+  --paper-ink: #1d1e33;
+  --paper-muted: #8f92ab;
+  --paper-line: #d9dbe8;
+  --chip: #f6f7fb;
+  --good: #168a52;
+  --good-bg: #e3f6ec;
+  --glow: #fff2c9;
+  --glow-ink: #c0703a;
+
+  --gold-1: #f4e3b0;
+  --gold-2: #dcb870;
+  --gold-3: #c4964a;
+  --gold-4: #b58638;
+  --gold-dark: #3a2a12;
+  --led-idle: #36c76c;
+  --led-busy: #ff9d2b;
+
+  --f-display: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #12131f;
+    --ground-glow: #1b1d33;
+    --ink: #eceefc;
+    --muted: #8f93b4;
+    --accent: #8f8fff;
+    --accent-ink: #12131f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #12131f;
+  --ground-glow: #1b1d33;
+  --ink: #eceefc;
+  --muted: #8f93b4;
+  --accent: #8f8fff;
+  --accent-ink: #12131f;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  margin: 0;
+  background: radial-gradient(70% 45% at 50% 60%, var(--ground-glow), var(--ground));
+  background-color: var(--ground);
+  color: var(--ink);
+  font-family: var(--f-display);
+  padding-inline: 16px;
+  padding-block: 28px 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-x: hidden;
+}
+
+/* ---------- machine ---------- */
+.machine {
+  position: relative;
+  width: min(400px, 100%);
+}
+.m-body {
+  height: 64px;
+  border-radius: 24px 24px 6px 6px;
+  background: linear-gradient(180deg, var(--gold-1) 0%, var(--gold-2) 38%, var(--gold-3) 72%, var(--gold-4) 100%);
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.75), 0 22px 30px -14px rgba(120, 80, 20, .38);
+  position: relative;
+  z-index: 3;
+}
+.m-body::after { /* soft highlight */
+  content: ""; position: absolute; left: 6%; right: 6%; top: 6px; height: 14px;
+  border-radius: 10px; background: linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,255,255,0));
+}
+.led {
+  position: absolute; right: 22px; top: 22px; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--led-idle); box-shadow: 0 0 10px 2px color-mix(in srgb, var(--led-idle) 55%, transparent);
+  transition: background .3s, box-shadow .3s; z-index: 4;
+}
+.machine.printing .led {
+  background: var(--led-busy); box-shadow: 0 0 10px 2px color-mix(in srgb, var(--led-busy) 60%, transparent);
+  animation: blink 1s steps(2, jump-none) infinite;
+}
+@keyframes blink { 50% { opacity: .45; } }
+.m-gap {
+  position: absolute; left: 14px; right: 14px; top: 60px; height: 12px;
+  background: var(--gold-dark); border-radius: 2px; z-index: 1;
+}
+.m-lip {
+  position: absolute; left: 0; right: 0; top: 70px; height: 18px; z-index: 5;
+  border-radius: 3px 3px 16px 16px;
+  background: linear-gradient(180deg, #e8cc88 0%, var(--gold-3) 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.55), 0 8px 14px -6px rgba(90, 60, 15, .35);
+}
+
+/* ---------- paper ---------- */
+.window {
+  position: relative; z-index: 2;
+  overflow: hidden;
+  padding: 0 22px 30px;
+  margin-top: 0;
+}
+.paper { transform: translateY(-110%); will-change: transform; }
+.tilt { transform-origin: 50% 0; transition: transform .3s cubic-bezier(.2,.8,.3,1); outline: none; }
+.tilt.ready { cursor: pointer; }
+.tilt.ready:focus-visible .receipt { outline: 3px solid var(--accent); outline-offset: 4px; }
+
+.receipt {
+  position: relative;
+  background: var(--paper);
+  color: var(--paper-ink);
+  border-radius: 0 0 28px 28px;
+  padding: 30px 24px 26px;
+  box-shadow: 0 26px 40px -20px rgba(50, 50, 120, .35), 0 2px 8px rgba(50, 50, 120, .08);
+  text-align: center;
+  user-select: none; -webkit-user-select: none;
+}
+.icon-wrap {
+  width: 60px; height: 60px; margin: 0 auto 14px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: radial-gradient(circle at 50% 40%, #fff7d8, var(--glow));
+  box-shadow: 0 0 0 6px rgba(255, 238, 180, .35), 0 6px 18px rgba(240, 200, 100, .4);
+}
+.icon-wrap svg { width: 28px; height: 28px; color: var(--glow-ink); }
+.receipt h1 { margin: 0 0 6px; font-size: 27px; line-height: 1.15; font-weight: 800; letter-spacing: -.02em; text-wrap: balance; }
+.receipt .sub { margin: 0 auto; max-width: 18ch; font-size: 15px; line-height: 1.4; color: var(--paper-muted); font-weight: 500; text-wrap: balance; }
+
+.perf { position: relative; margin: 26px -24px 24px; height: 0; border-top: 1.5px dashed var(--paper-line); }
+.perf::before, .perf::after {
+  content: ""; position: absolute; top: -12px; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--ground); box-shadow: inset 0 1px 3px rgba(40,40,100,.1);
+}
+.perf::before { left: -11px; }
+.perf::after { right: -11px; }
+
+.grid { display: grid; grid-template-columns: 1fr auto; gap: 18px 12px; margin: 0; text-align: left; }
+.grid > div { min-width: 0; }
+.grid > div:nth-child(even) { text-align: right; }
+.grid dt { font-size: 11.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--paper-muted); font-weight: 600; margin-bottom: 5px; }
+.grid dd { margin: 0; font-size: 15px; font-weight: 700; }
+.grid .mono { font-family: var(--f-mono); font-weight: 500; font-size: 14px; letter-spacing: .01em; overflow-wrap: anywhere; }
+.grid .amount { font-size: 22px; font-weight: 800; letter-spacing: -.02em; }
+.pill { display: inline-block; padding: 4px 11px; border-radius: 8px; background: var(--good-bg); color: var(--good); font-size: 13.5px; font-weight: 600; }
+
+.card {
+  margin-top: 22px; display: flex; align-items: center; gap: 14px; text-align: left;
+  background: var(--chip); border-radius: 16px; padding: 13px 16px;
+}
+.card svg { width: 42px; height: 30px; flex: none; }
+.card b { display: block; font-size: 15px; font-weight: 700; }
+.card span { font-family: var(--f-mono); font-size: 13px; color: var(--paper-muted); letter-spacing: .08em; }
+
+.barcode { margin-top: 22px; }
+.barcode svg { display: block; width: 100%; height: 54px; }
+.barcode p { margin: 8px 0 0; font-family: var(--f-mono); font-size: 12.5px; letter-spacing: .14em; color: var(--paper-muted); }
+
+/* ---------- below the machine ---------- */
+.foot { min-height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; margin-top: 4px; }
+#hint { margin: 0; font-size: 14px; color: var(--muted); font-weight: 500; text-align: center; }
+#again {
+  font: inherit; font-weight: 700; font-size: 14.5px; border: 0; cursor: pointer;
+  background: var(--accent); color: var(--accent-ink); padding: 12px 22px; border-radius: 12px;
+}
+#again:hover { filter: brightness(1.08); }
+#again:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+#confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 60; }
+
+@media (prefers-reduced-motion: reduce) {
+  .machine.printing .led { animation: none; }
+  .tilt { transition: none; }
+}
+</style>
+
+<main style="width:100%;display:flex;flex-direction:column;align-items:center">
+  <div class="machine" id="machine">
+    <div class="m-body"></div>
+    <i class="led" aria-hidden="true"></i>
+    <div class="m-gap" aria-hidden="true"></div>
+    <div class="m-lip" aria-hidden="true"></div>
+
+    <div class="window">
+      <div class="paper" id="paper">
+        <div class="tilt" id="tilt" tabindex="-1">
+          <article class="receipt" id="receipt">
+            <div class="icon-wrap" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 8.5V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1.5a2.5 2.5 0 0 0 0 5V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3.5a2.5 2.5 0 0 0 0-5Z"/>
+                <path d="M13 5v3M13 11v2M13 16v3" />
+              </svg>
+            </div>
+            <h1>Thank you!</h1>
+            <p class="sub">Your ticket has been issued successfully</p>
+
+            <div class="perf"></div>
+
+            <dl class="grid">
+              <div><dt>Ticket ID</dt><dd class="mono" data-f="ticketId"></dd></div>
+              <div><dt>Amount</dt><dd class="amount" data-f="amount"></dd></div>
+              <div><dt>Date &amp; time</dt><dd data-f="when"></dd></div>
+              <div><dt>Status</dt><dd><span class="pill">Confirmed</span></dd></div>
+            </dl>
+
+            <div class="card">
+              <svg viewBox="0 0 42 30" aria-hidden="true">
+                <rect width="42" height="30" rx="6" fill="#5b5bd6"/>
+                <rect y="8" width="42" height="6" fill="#3d3da8"/>
+                <rect x="6" y="20" width="12" height="4" rx="2" fill="#c9c9f5"/>
+              </svg>
+              <div><b data-f="name"></b><span data-f="cardMasked"></span></div>
+            </div>
+
+            <div class="barcode">
+              <svg viewBox="0 0 200 54" preserveAspectRatio="none" aria-hidden="true" data-barcode></svg>
+              <p data-f="code"></p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <p id="hint" role="status" aria-live="polite">Warming up the printer…</p>
+    <button id="again" type="button" hidden>Print another ticket</button>
+  </div>
+</main>
+<canvas id="confetti" aria-hidden="true"></canvas>
+
+<script>
+(() => {
+  /* Edit these to change what the ticket shows. */
+  const CONFIG = {
+    ticketId: '0471825063917',
+    amount: '$99.99',
+    name: 'Aduok Code',
+    card: '5604',
+    code: '7 3052849 618205'
+  };
+
+  const $ = s => document.querySelector(s);
+  const machine = $('#machine'), paper = $('#paper'), tilt = $('#tilt'), receipt = $('#receipt');
+  const hint = $('#hint'), again = $('#again'), canvas = $('#confetti');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let state = 'idle';
+
+  /* ---- fill content ---- */
+  const when = new Date().toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', ' ·');
+  const values = { ticketId: CONFIG.ticketId, amount: CONFIG.amount, name: CONFIG.name, cardMasked: '•••• ' + CONFIG.card, code: CONFIG.code, when };
+  receipt.querySelectorAll('[data-f]').forEach(el => { el.textContent = values[el.dataset.f]; });
+
+  /* ---- barcode (seeded so it never changes between prints) ---- */
+  (function barcode() {
+    const svg = receipt.querySelector('[data-barcode]');
+    let seed = 73052849;
+    const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
+    let x = 0, out = '';
+    while (x < 200) {
+      const w = [1, 1, 2, 3][Math.floor(rnd() * 4)];
+      if (x + w > 200) break;
+      out += `<rect x="${x}" y="0" width="${w}" height="54" fill="#15162a"/>`;
+      x += w + [1, 1, 2][Math.floor(rnd() * 3)];
+    }
+    svg.innerHTML = out;
+  })();
+
+  /* ---- printing: the paper feeds out in short, uneven pushes ---- */
+  function print() {
+    state = 'printing';
+    machine.classList.add('printing');
+    hint.textContent = 'Printing your ticket…';
+    again.hidden = true;
+    tilt.classList.remove('ready');
+    tilt.removeAttribute('role'); tilt.setAttribute('tabindex', '-1');
+    tilt.style.transform = '';
+    paper.style.visibility = 'visible';
+    paper.style.transform = '';
+
+    const H = paper.offsetHeight;
+    const kf = [{ transform: `translateY(${-H}px)`, offset: 0, easing: 'linear' }];
+    if (reduce) {
+      kf.push({ transform: 'translateY(0px)', offset: 1 });
+    } else {
+      const N = 16;
+      for (let i = 1; i <= N; i++) {
+        const hold = i === N ? 0 : 0.18 + Math.random() * 0.3;
+        const start = (i - 1) / N, end = i / N;
+        const moveEnd = start + (end - start) * (1 - hold);
+        const y = -H * (1 - i / N);
+        kf.push({ transform: `translateY(${y}px)`, offset: i === N ? 1 : moveEnd, easing: 'linear' });
+        if (i !== N) kf.push({ transform: `translateY(${y}px)`, offset: end, easing: 'cubic-bezier(.4,0,.2,1)' });
+      }
+      // each move segment eases; hold segments are flat
+      for (let k = 0; k < kf.length - 1; k++) {
+        kf[k].easing = kf[k].transform === kf[k + 1].transform ? 'linear' : 'cubic-bezier(.45,0,.25,1)';
+      }
+    }
+    const anim = paper.animate(kf, { duration: reduce ? 500 : 6800, fill: 'forwards' });
+    anim.onfinish = () => {
+      paper.style.transform = 'translateY(0)';
+      anim.cancel();
+      ready();
+    };
+  }
+
+  function ready() {
+    state = 'ready';
+    machine.classList.remove('printing');
+    hint.textContent = 'Tap the receipt to tear it off';
+    tilt.classList.add('ready');
+    tilt.setAttribute('role', 'button');
+    tilt.setAttribute('tabindex', '0');
+    tilt.setAttribute('aria-label', 'Ticket receipt. Press to tear it off.');
+    if (!reduce) burst();
+  }
+
+  /* ---- hover tilt ---- */
+  tilt.addEventListener('pointermove', e => {
+    if (state !== 'ready' || reduce) return;
+    const r = paper.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width - 0.5;
+    tilt.style.transform = `rotate(${(px * 5).toFixed(2)}deg)`;
+  });
+  tilt.addEventListener('pointerleave', () => { if (state === 'ready') tilt.style.transform = ''; });
+
+  /* ---- confetti ---- */
+  const ctx = canvas.getContext('2d');
+  const palette = ['#6c5ce7', '#4f8cff', '#ff5c8a', '#ff9f43', '#2ec4b6', '#f6c445', '#a66cff'];
+  let parts = [], raf = 0, dpr = 1;
+  function sizeCanvas() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = innerWidth * dpr; canvas.height = innerHeight * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  addEventListener('resize', sizeCanvas); sizeCanvas();
+
+  function burst() {
+    const m = machine.getBoundingClientRect();
+    const oy = m.top + 66;
+    for (let i = 0; i < 150; i++) {
+      const ang = -Math.PI / 2 + (Math.random() - 0.5) * 2.3;
+      const sp = 6 + Math.random() * 12;
+      parts.push({
+        x: m.left + 40 + Math.random() * (m.width - 80), y: oy,
+        vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
+        s: 6 + Math.random() * 7, r: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.35,
+        c: palette[Math.floor(Math.random() * palette.length)],
+        shape: Math.floor(Math.random() * 3), life: 0, max: 130 + Math.random() * 70
+      });
+    }
+    if (!raf) raf = requestAnimationFrame(tick);
+  }
+  function tick() {
+    ctx.clearRect(0, 0, innerWidth, innerHeight);
+    parts = parts.filter(p => p.life < p.max && p.y < innerHeight + 30);
+    for (const p of parts) {
+      p.life++; p.vy += 0.36; p.vx *= 0.985; p.vy *= 0.985; p.x += p.vx; p.y += p.vy; p.r += p.vr;
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, (p.max - p.life) / 40);
+      ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillStyle = p.c;
+      if (p.shape === 0) ctx.fillRect(-p.s / 2, -p.s / 3, p.s, p.s * 0.66);
+      else if (p.shape === 1) { ctx.beginPath(); ctx.arc(0, 0, p.s / 2.4, 0, 6.283); ctx.fill(); }
+      else { ctx.beginPath(); ctx.moveTo(0, -p.s / 2); ctx.lineTo(p.s / 2, p.s / 2); ctx.lineTo(-p.s / 2, p.s / 2); ctx.closePath(); ctx.fill(); }
+      ctx.restore();
+    }
+    raf = parts.length ? requestAnimationFrame(tick) : 0;
+    if (!parts.length) ctx.clearRect(0, 0, innerWidth, innerHeight);
+  }
+
+  /* ---- tear sound (plays only after the click) ---- */
+  function tearSound() {
+    try {
+      const ac = new (window.AudioContext || window.webkitAudioContext)();
+      const len = Math.floor(ac.sampleRate * 0.38);
+      const buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) {
+        const env = Math.pow(1 - i / len, 1.4);
+        const grit = Math.random() < 0.18 ? 1 : 0.35;
+        d[i] = (Math.random() * 2 - 1) * env * grit;
+      }
+      const src = ac.createBufferSource(); src.buffer = buf;
+      const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2200; bp.Q.value = 0.7;
+      const g = ac.createGain(); g.gain.value = 0.28;
+      src.connect(bp); bp.connect(g); g.connect(ac.destination); src.start();
+      src.onended = () => ac.close();
+    } catch (e) { /* sound is optional */ }
+  }
+
+  /* ---- tear: a jagged split at the click point, the two halves fly off ---- */
+  function tear(clientY) {
+    if (state !== 'ready') return;
+    state = 'tearing';
+    hint.textContent = '';
+    tilt.style.transition = 'none'; tilt.style.transform = '';
+    void tilt.offsetWidth;
+    const r = receipt.getBoundingClientRect();
+    const W = r.width, H = r.height;
+    // always split along the dashed perforation line, wherever the click lands
+    const pr = receipt.querySelector('.perf').getBoundingClientRect();
+    const ty = pr.top - r.top + pr.height / 2;
+
+    const pts = [];
+    for (let x = W, i = 0; x > 0; x -= 8 + Math.random() * 5, i++) {
+      pts.push([x, ty + (i % 2 ? 3 : -3) + (Math.random() - 0.5) * 3]);
+    }
+    pts.push([0, ty]);
+    const edgeRtl = pts.map(p => `${p[0].toFixed(1)}px ${p[1].toFixed(1)}px`).join(',');
+    const edgeLtr = pts.slice().reverse().map(p => `${p[0].toFixed(1)}px ${p[1].toFixed(1)}px`).join(',');
+    const topPoly = `polygon(0px 0px, ${W}px 0px, ${edgeRtl})`;
+    const botPoly = `polygon(${edgeLtr}, ${W}px ${H}px, 0px ${H}px)`;
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${W}px;height:${H}px;z-index:50;pointer-events:none`;
+    const mk = poly => {
+      const outer = document.createElement('div');
+      outer.style.cssText = `position:absolute;inset:0;transform-origin:${W / 2}px ${ty}px;filter:drop-shadow(0 8px 10px rgba(30,30,80,.28))`;
+      const clip = document.createElement('div');
+      clip.style.cssText = `position:absolute;inset:0;clip-path:${poly}`;
+      const c = receipt.cloneNode(true);
+      c.removeAttribute('id');
+      c.style.cssText = `position:absolute;left:0;top:0;width:${W}px;margin:0`;
+      clip.appendChild(c); outer.appendChild(clip);
+      return outer;
+    };
+    const top = mk(topPoly), bot = mk(botPoly);
+    overlay.append(top, bot);
+    document.body.appendChild(overlay);
+    paper.style.visibility = 'hidden';
+    tilt.style.transition = '';
+    tearSound();
+
+    const vw = innerWidth, vh = innerHeight;
+    const opts = { fill: 'forwards' };
+    let a, b;
+    if (reduce) {
+      a = top.animate([{ opacity: 1 }, { opacity: 0 }], { ...opts, duration: 350 });
+      b = bot.animate([{ opacity: 1 }, { opacity: 0 }], { ...opts, duration: 350 });
+    } else {
+      a = top.animate([
+        { transform: 'none', offset: 0, easing: 'ease-out' },
+        { transform: 'translate(-8px,-14px) rotate(-3deg)', offset: 0.16, easing: 'cubic-bezier(.5,0,.9,.6)' },
+        { transform: `translate(${-vw * 0.6}px,${-(r.top + H + 240)}px) rotate(-42deg)`, offset: 1 }
+      ], { ...opts, duration: 1050 });
+      b = bot.animate([
+        { transform: 'none', offset: 0, easing: 'ease-out' },
+        { transform: 'translate(10px,12px) rotate(4deg)', offset: 0.16, easing: 'cubic-bezier(.5,0,.9,.6)' },
+        { transform: `translate(${vw * 0.5}px,${vh - r.top + 260}px) rotate(34deg)`, offset: 1 }
+      ], { ...opts, duration: 1150 });
+    }
+    Promise.all([a.finished, b.finished]).then(() => {
+      overlay.remove();
+      state = 'torn';
+      hint.textContent = 'Ticket torn off.';
+      again.hidden = false;
+      again.focus({ preventScroll: true });
+    });
+  }
+
+  tilt.addEventListener('click', e => tear(e.clientY));
+  tilt.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      tear(0);
+    }
+  });
+  again.addEventListener('click', print);
+
+  setTimeout(print, reduce ? 200 : 900);
+})();
+</script>
+
+</body></html>
