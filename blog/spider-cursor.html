@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crawling Spiders</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #000;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" aria-label="Animated spiders following the pointer"></canvas>
+
+  <script>
+    (() => {
+      'use strict';
+
+      /* ---------- Configuration ---------- */
+      const CONFIG = Object.freeze({
+        spiderCount: 2,
+        anchorsPerSpider: 333,
+        legsPerSpider: 9,
+        maxActiveLegs: 8,
+        legSegments: 60,
+        reachSpeed: 0.1,
+        followEase: 0.1,
+        colors: { background: '#000', foreground: '#fff' },
+      });
+
+      const { sin, cos, hypot, min, max, PI, random } = Math;
+      const TAU = PI * 2;
+
+      /* ---------- Helpers ---------- */
+      const randomBetween = (from, to) => from + random() * (to - from);
+      const clamp = (value, lo, hi) => max(lo, min(hi, value));
+      const lerp = (a, b, t) => a + (b - a) * t;
+      const times = (n, factory) => Array.from({ length: n }, (_, i) => factory(i));
+
+      /** Smooth pseudo-noise based on layered sine waves. */
+      function wobble(x, y, t = 101) {
+        const a = sin(0.3 * x + 1.4 * t + 2.0 + 2.5 * sin(0.4 * y - 1.3 * t + 1.0));
+        const b = sin(0.2 * y + 1.5 * t + 2.8 + 2.3 * sin(0.5 * x - 1.2 * t + 0.5));
+        return a + b;
+      }
+
+      /* ---------- Canvas setup ---------- */
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+      const viewport = { width: 0, height: 0 };
+
+      function resizeCanvas() {
+        const dpr = window.devicePixelRatio || 1;
+        viewport.width = window.innerWidth;
+        viewport.height = window.innerHeight;
+        canvas.width = viewport.width * dpr;
+        canvas.height = viewport.height * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      /* ---------- Drawing primitives ---------- */
+      function drawDot(x, y, radius) {
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, TAU);
+        ctx.fill();
+      }
+
+      function drawWobblyLine(x0, y0, x1, y1) {
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        for (let i = 1; i <= CONFIG.legSegments; i++) {
+          const t = i / CONFIG.legSegments;
+          const x = lerp(x0, x1, t);
+          const y = lerp(y0, y1, t);
+          const offset = wobble(x / 5 + x0, y / 5 + y0) * 2;
+          ctx.lineTo(x + offset, y + offset);
+        }
+        ctx.stroke();
+      }
+
+      /* ---------- Domain ---------- */
+      class Anchor {
+        constructor() {
+          this.x = randomBetween(0, viewport.width);
+          this.y = randomBetween(0, viewport.height);
+          this.reach = 0;   // 0 = leg retracted, 1 = leg fully attached
+          this.radius = 0;
+        }
+      }
+
+      class Spider {
+        constructor() {
+          this.seed = randomBetween(0, 100);
+          this.x = randomBetween(0, viewport.width);
+          this.y = randomBetween(0, viewport.height);
+          this.target = { x: this.x, y: this.y };
+          this.wanderSpeed = { x: randomBetween(0.5, 1), y: randomBetween(0.5, 1) };
+          this.wanderRadius = { x: randomBetween(50, 100), y: randomBetween(50, 100) };
+          this.bodyRadius = viewport.width / randomBetween(100, 250);
+
+          this.legOrigins = times(CONFIG.legsPerSpider, (i) => {
+            const angle = (i / CONFIG.legsPerSpider) * TAU;
+            return { x: cos(angle), y: sin(angle) };
+          });
+          this.anchors = times(CONFIG.anchorsPerSpider, () => new Anchor());
+        }
+
+        follow(x, y) {
+          this.target.x = x;
+          this.target.y = y;
+        }
+
+        update(time) {
+          this.#move(time);
+          this.#updateAnchors();
+        }
+
+        draw() {
+          for (const anchor of this.anchors) {
+            this.#drawLegsTo(anchor);
+            if (anchor.radius > 0) drawDot(anchor.x, anchor.y, anchor.radius);
+          }
+        }
+
+        #move(time) {
+          const goalX = this.target.x + cos(time * this.wanderSpeed.x + this.seed) * this.wanderRadius.x;
+          const goalY = this.target.y + sin(time * this.wanderSpeed.y + this.seed) * this.wanderRadius.y;
+          const maxStep = viewport.width / 100;
+
+          this.x += min(maxStep, (goalX - this.x) * CONFIG.followEase);
+          this.y += min(maxStep, (goalY - this.y) * CONFIG.followEase);
+        }
+
+        #updateAnchors() {
+          const grabDistance = viewport.width / 10;
+          let activeLegs = 0;
+
+          for (const anchor of this.anchors) {
+            const distance = hypot(anchor.x - this.x, anchor.y - this.y);
+            const isGrabbed = distance < grabDistance && activeLegs++ < CONFIG.maxActiveLegs;
+
+            anchor.radius = min(2, viewport.width / distance / 5) * (isGrabbed ? 1.5 : 1);
+            anchor.reach = clamp(
+              anchor.reach + (isGrabbed ? CONFIG.reachSpeed : -CONFIG.reachSpeed),
+              0,
+              1,
+            );
+          }
+        }
+
+        #drawLegsTo(anchor) {
+          if (anchor.reach === 0) return;
+          const t = anchor.reach ** 2;
+
+          for (const origin of this.legOrigins) {
+            const startX = this.x + origin.x * this.bodyRadius;
+            const startY = this.y + origin.y * this.bodyRadius;
+            drawWobblyLine(lerp(startX, anchor.x, t), lerp(startY, anchor.y, t), startX, startY);
+          }
+        }
+      }
+
+      /* ---------- App ---------- */
+      let spiders = [];
+
+      function init() {
+        resizeCanvas();
+        spiders = times(CONFIG.spiderCount, () => new Spider());
+      }
+
+      function frame(timestamp) {
+        ctx.fillStyle = CONFIG.colors.background;
+        ctx.fillRect(0, 0, viewport.width, viewport.height);
+        ctx.fillStyle = ctx.strokeStyle = CONFIG.colors.foreground;
+
+        const seconds = timestamp / 1000;
+        for (const spider of spiders) {
+          spider.update(seconds);
+          spider.draw();
+        }
+        requestAnimationFrame(frame);
+      }
+
+      window.addEventListener('pointermove', ({ clientX, clientY }) => {
+        spiders.forEach((spider) => spider.follow(clientX, clientY));
+      });
+      window.addEventListener('resize', init);
+
+      init();
+      requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>
