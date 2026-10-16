@@ -1,0 +1,450 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Dress Showcase</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;700&display=swap">
+<style>
+  /* Layout concept: a dark studio wall with one brass rail across the top.
+     Nine garments hang from it. The piece under the cursor swings forward and
+     grows, its neighbours step aside and dim, and everything settles back on leave. */
+  :root {
+    --wall: #1a1e25;
+    --wall-2: #2a303b;
+    --ink: #eef0f3;
+    --muted: #9aa3b0;
+    --accent: #f2b544;
+    --accent-ink: #1b1303;
+    --brass-1: #e0bc72;
+    --brass-2: #8a6a2e;
+    --walnut: #7a4a2a;
+    --hanger: #b9bfc9;
+    --rim: rgba(255, 255, 255, 0.16);
+    --line: rgba(255, 255, 255, 0.1);
+    --glow: rgba(255, 210, 140, 0.22);
+    --shadow: rgba(0, 0, 0, 0.6);
+    --font-display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+    --font-body: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "DM Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    color-scheme: dark;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --wall: #dfe3e8;
+      --wall-2: #f4f5f7;
+      --ink: #171a20;
+      --muted: #566070;
+      --accent: #b8620b;
+      --accent-ink: #ffffff;
+      --brass-1: #d2ad62;
+      --brass-2: #7b5d27;
+      --hanger: #6c7480;
+      --rim: rgba(0, 0, 0, 0.2);
+      --line: rgba(0, 0, 0, 0.12);
+      --glow: rgba(255, 255, 255, 0.85);
+      --shadow: rgba(30, 35, 45, 0.38);
+      color-scheme: light;
+    }
+  }
+  :root[data-theme="light"] {
+    --wall: #dfe3e8;
+    --wall-2: #f4f5f7;
+    --ink: #171a20;
+    --muted: #566070;
+    --accent: #b8620b;
+    --accent-ink: #ffffff;
+    --brass-1: #d2ad62;
+    --brass-2: #7b5d27;
+    --hanger: #6c7480;
+    --rim: rgba(0, 0, 0, 0.2);
+    --line: rgba(0, 0, 0, 0.12);
+    --glow: rgba(255, 255, 255, 0.85);
+    --shadow: rgba(30, 35, 45, 0.38);
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { min-height: 100%; }
+  body {
+    margin: 0;
+    background: radial-gradient(120% 70% at 50% 0%, var(--wall-2), var(--wall) 70%), var(--wall);
+    background-color: var(--wall);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.5;
+    overflow-x: hidden;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+
+  /* header */
+  .top { padding-block: 22px 0; }
+  .top .wrap { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .brand {
+    margin: 0;
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 2rem;
+    letter-spacing: 0.01em;
+    line-height: 1;
+  }
+  .brand i { font-style: normal; color: var(--accent); }
+  .mono {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* section label */
+  .label-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding-block: 56px 34px;
+  }
+  .label-row .mono:first-child { color: var(--ink); }
+  .label-row .bar { width: 1px; height: 12px; background: var(--line); }
+
+  /* rail */
+  .scroller {
+    container-type: inline-size;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .scroller::-webkit-scrollbar { display: none; width: 0; height: 0; }
+  .rail {
+    --gap: 8px;
+    --pw: clamp(54px, calc((100cqw - 8 * var(--gap) - 6px) / 9.9), 112px);
+    position: relative;
+    min-width: calc(9 * var(--pw) + 8 * var(--gap) + var(--pw) * 0.8);
+    padding-inline: calc(var(--pw) * 0.4);
+  }
+  .rail-bar {
+    position: absolute;
+    left: 0; right: 0; top: 0;
+    height: 10px;
+    border-radius: 6px;
+    background: linear-gradient(to bottom, var(--brass-1), var(--brass-2));
+    box-shadow: 0 6px 14px -6px var(--shadow);
+  }
+  .rail-bar::before, .rail-bar::after {
+    content: "";
+    position: absolute;
+    top: -8px;
+    width: 12px; height: 26px;
+    border-radius: 5px;
+    background: linear-gradient(to right, var(--brass-2), var(--brass-1) 45%, var(--brass-2));
+  }
+  .rail-bar::before { left: 0; }
+  .rail-bar::after { right: 0; }
+
+  .glow {
+    position: absolute;
+    top: 8%;
+    left: var(--gx, 50%);
+    width: calc(var(--pw) * 3.6);
+    height: calc(var(--pw) * 3.6);
+    transform: translateX(-50%);
+    border-radius: 50%;
+    background: radial-gradient(closest-side, var(--glow), transparent);
+    opacity: 0;
+    transition: left 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.5s ease;
+    pointer-events: none;
+  }
+  .rail.has-active .glow { opacity: 1; }
+
+  .pieces {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    gap: var(--gap);
+    padding-top: 4px;
+    min-height: calc(var(--pw) * 2.7 + 40px);
+  }
+
+  .piece {
+    flex: none;
+    width: var(--pw);
+    height: calc(var(--pw) * 1.6);
+    padding: 0;
+    margin: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transform-origin: 50% 0;
+    transform: translateX(calc(var(--dir, 0) * var(--pw) * 0.34));
+    transition: transform 0.8s cubic-bezier(0.22, 1.12, 0.36, 1), opacity 0.45s ease, filter 0.5s ease;
+  }
+  .piece:focus-visible { outline: 2px solid var(--accent); outline-offset: 6px; border-radius: 6px; }
+  .rail.has-active .piece:not(.is-active) { opacity: 0.45; }
+  .piece.is-active {
+    z-index: 5;
+    transform: translateY(14px) scale(1.5);
+    filter: drop-shadow(0 20px 18px var(--shadow));
+  }
+
+  .sway {
+    display: block;
+    width: 100%;
+    transform-origin: 50% 0;
+    animation: sway 7s ease-in-out infinite;
+    animation-delay: calc(var(--i) * -0.9s);
+  }
+  .piece.is-active .sway { animation: settle 1.1s cubic-bezier(0.2, 0.8, 0.3, 1) both; }
+  .sway svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .g-rim { stroke: var(--rim); stroke-width: 0.8; }
+
+  @keyframes sway {
+    0%, 100% { transform: rotate(0deg); }
+    30% { transform: rotate(1.3deg); }
+    70% { transform: rotate(-1.3deg); }
+  }
+  @keyframes settle {
+    0% { transform: rotate(-7deg); }
+    35% { transform: rotate(4deg); }
+    65% { transform: rotate(-1.6deg); }
+    100% { transform: rotate(0deg); }
+  }
+
+  /* caption */
+  .caption {
+    max-width: 40rem;
+    margin: 6px auto 0;
+    min-height: 9rem;
+    text-align: center;
+    transition: opacity 0.14s ease, transform 0.14s ease;
+  }
+  .caption.swap { opacity: 0; transform: translateY(5px); }
+  .cap-name {
+    margin: 10px 0 8px;
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: clamp(2rem, 5.4vw, 3.1rem);
+    line-height: 1.05;
+    text-wrap: balance;
+  }
+  .cap-meta {
+    margin: 0;
+    color: var(--muted);
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px 14px;
+  }
+  .cap-meta .dot { width: 11px; height: 11px; border-radius: 50%; border: 1px solid var(--rim); flex: none; }
+  .cap-meta b { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .hint-scroll { display: none; text-align: center; margin: 6px 0 0; }
+
+  /* strip */
+  .strip {
+    margin-top: 40px;
+    overflow: hidden;
+    background: var(--accent);
+    color: var(--accent-ink);
+    padding-block: 11px;
+    padding-bottom: calc(11px + env(safe-area-inset-bottom, 0px));
+  }
+  .strip-track {
+    display: flex;
+    width: max-content;
+    animation: strip 46s linear infinite;
+  }
+  .strip-track span {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    padding-right: 2.2rem;
+  }
+  .strip-track span::after { content: "/"; margin-left: 2.2rem; opacity: 0.55; }
+  @keyframes strip { to { transform: translateX(-50%); } }
+
+  @media (max-width: 900px) { .hint-scroll { display: block; } }
+  @media (prefers-reduced-motion: reduce) {
+    .sway, .piece.is-active .sway, .strip-track { animation: none; }
+    .piece, .glow, .caption { transition-duration: 0.01s; }
+  }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="shade" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#000" stop-opacity=".30"/>
+      <stop offset=".22" stop-color="#000" stop-opacity=".02"/>
+      <stop offset=".55" stop-color="#fff" stop-opacity=".07"/>
+      <stop offset=".8" stop-color="#000" stop-opacity=".06"/>
+      <stop offset="1" stop-color="#000" stop-opacity=".34"/>
+    </linearGradient>
+    <pattern id="knit" width="5" height="6" patternUnits="userSpaceOnUse">
+      <path d="M0 6 L2.5 0 L5 6" fill="none" stroke="rgba(0,0,0,.24)" stroke-width="1"/>
+    </pattern>
+  </defs>
+</svg>
+
+<main>
+  <div class="wrap" style="padding-bottom: 56px;">
+    <h1 class="sr" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">Dress Showcase</h1>
+    <div class="label-row">
+      <span class="mono">Hanging now</span>
+      <span class="bar"></span>
+      <span class="mono">9 pieces</span>
+    </div>
+
+    <div class="scroller" id="scroller">
+      <div class="rail" id="rail">
+        <div class="rail-bar"></div>
+        <div class="glow"></div>
+        <div class="pieces" id="pieces"></div>
+      </div>
+    </div>
+
+    <p class="mono hint-scroll">Swipe the rail sideways &middot; tap a piece</p>
+  </div>
+</main>
+
+<script>
+(function () {
+  var P = [
+    { name: 'Mundu Tee',        kind: 'tee',     color: '#e9e4d8', colorName: 'Mundu white',     fabric: 'Handloom cotton',        price: '1,490' },
+    { name: 'Monsoon Crew',     kind: 'crew',    color: '#35465a', colorName: 'Rain slate',      fabric: 'Brushed cotton',         price: '2,290' },
+    { name: 'Backwater Hoodie', kind: 'hoodie',  color: '#1f5c47', colorName: 'Backwater green', fabric: 'Heavy fleece, 420 gsm',  price: '3,490' },
+    { name: 'No. 07 Jersey',    kind: 'jersey',  color: '#121316', colorName: 'Match-night black', fabric: 'Open mesh knit',       price: '2,190' },
+    { name: 'Coir Sweater',     kind: 'sweater', color: '#cdb89a', colorName: 'Coir sand',       fabric: 'Merino-cotton knit',     price: '3,190' },
+    { name: 'Neela Crew',       kind: 'crew',    color: '#4b3f7a', colorName: 'Neela indigo',    fabric: 'Garment-dyed cotton',    price: '2,290' },
+    { name: 'Laterite Tee',     kind: 'tee',     color: '#a5502f', colorName: 'Laterite red',    fabric: 'Slub cotton',            price: '1,590' },
+    { name: 'Clove Hoodie',     kind: 'hoodie',  color: '#3b2d29', colorName: 'Clove brown',     fabric: 'Heavy fleece, 420 gsm',  price: '3,490' },
+    { name: 'Banyan Crew',      kind: 'crew',    color: '#8e9c7f', colorName: 'Banyan sage',     fabric: 'Brushed cotton',         price: '2,290' }
+  ];
+
+  var D = {
+    tee:  'M56 34 Q70 48 84 34 L112 46 L128 82 L108 90 L98 76 L98 202 Q70 208 42 202 L42 76 L32 90 L12 82 L28 46 Z',
+    crew: 'M56 34 Q70 48 84 34 L102 42 Q112 48 114 70 L120 192 L104 196 L98 106 L98 204 Q70 210 42 204 L42 106 L36 196 L20 192 L26 70 Q28 48 38 42 Z',
+    hood: 'M52 42 Q70 60 88 42 L104 48 Q114 54 116 74 L122 192 L106 196 L99 108 L100 204 Q70 210 40 204 L41 108 L34 196 L18 192 L24 74 Q26 54 36 48 Z'
+  };
+
+  var NECK = '<path d="M56 34 Q70 42 84 34 Q70 49 56 34 Z" fill="rgba(0,0,0,.32)"/>' +
+             '<path d="M56 34 Q70 49 84 34" fill="none" stroke="rgba(0,0,0,.3)" stroke-width="3.2" stroke-linecap="round"/>';
+  var SEAM = 'fill="none" stroke="rgba(0,0,0,.2)" stroke-width="1.2" stroke-linecap="round"';
+
+  function body(d, c, extra) {
+    return '<path d="' + d + '" fill="' + c + '"/>' +
+           (extra || '') +
+           '<path d="' + d + '" fill="url(#shade)"/>' +
+           '<path d="' + d + '" fill="none" class="g-rim"/>';
+  }
+
+  function garment(p) {
+    var k = p.kind, c = p.color, out = '';
+    if (k === 'tee') {
+      out = body(D.tee, c) + NECK +
+        '<path d="M28 46 L42 76 M112 46 L98 76" ' + SEAM + '/>' +
+        '<path d="M80 66 l3.4 5.4 -3.4 5.4 -3.4 -5.4z" fill="var(--accent)"/>' +
+        '<path d="M42 196 Q70 202 98 196" ' + SEAM + '/>';
+    } else if (k === 'crew') {
+      out = body(D.crew, c) + NECK +
+        '<path d="M38 44 Q44 80 42 106 M102 44 Q96 80 98 106" ' + SEAM + '/>' +
+        '<path d="M20 186 L36 190 M104 190 L120 186 M42 196 Q70 202 98 196" ' + SEAM + '/>' +
+        '<path d="M80 74 l3.4 5.4 -3.4 5.4 -3.4 -5.4z" fill="var(--accent)"/>';
+    } else if (k === 'sweater') {
+      out = body(D.crew, c, '<path d="' + D.crew + '" fill="url(#knit)"/>') +
+        '<path d="M56 34 Q70 49 84 34" fill="none" stroke="rgba(0,0,0,.34)" stroke-width="5" stroke-linecap="round"/>' +
+        '<path d="M38 44 Q44 80 42 106 M102 44 Q96 80 98 106" ' + SEAM + '/>' +
+        '<path d="M21 180 L35 184 M22 186 L36 190 M105 184 L119 180 M104 190 L118 186 M42 190 Q70 196 98 190 M42 196 Q70 202 98 196" ' + SEAM + '/>';
+    } else if (k === 'hoodie') {
+      var hood = 'M38 52 Q33 12 70 12 Q107 12 102 52 L88 44 Q70 40 52 44 Z';
+      out = '<path d="' + hood + '" fill="' + c + '"/><path d="' + hood + '" fill="url(#shade)"/>' +
+        body(D.hood, c) +
+        '<path d="M52 42 Q70 60 88 42 Q70 34 52 42 Z" fill="rgba(0,0,0,.4)"/>' +
+        '<path d="M52 42 Q70 60 88 42" fill="none" stroke="rgba(0,0,0,.28)" stroke-width="3.4" stroke-linecap="round"/>' +
+        '<path d="M63 55 L61 94 M77 55 L79 92" fill="none" stroke="rgba(255,255,255,.72)" stroke-width="1.6" stroke-linecap="round"/>' +
+        '<path d="M50 148 L90 148 L98 184 L42 184 Z" fill="rgba(0,0,0,.07)" stroke="rgba(0,0,0,.26)" stroke-width="1.3" stroke-linejoin="round"/>' +
+        '<path d="M34 186 L18 182 M106 186 L122 182 M41 196 Q70 202 99 196" ' + SEAM + '/>';
+    } else if (k === 'jersey') {
+      out = body(D.tee, c) +
+        '<path d="M16 73 L35 81 M124 73 L105 81" fill="none" stroke="#ff7a3d" stroke-width="4" stroke-linecap="butt"/>' +
+        '<path d="M56 34 Q70 42 84 34 Q70 49 56 34 Z" fill="rgba(0,0,0,.4)"/>' +
+        '<polygon points="54,32 68,51 58,59 43,42" fill="#ff7a3d"/>' +
+        '<polygon points="86,32 72,51 82,59 97,42" fill="#ff7a3d"/>' +
+        '<path d="M70 52 L70 76" stroke="rgba(255,255,255,.35)" stroke-width="1.2"/>' +
+        '<circle cx="70" cy="62" r="1.5" fill="rgba(255,255,255,.55)"/><circle cx="70" cy="70" r="1.5" fill="rgba(255,255,255,.55)"/>' +
+        '<text x="70" y="136" text-anchor="middle" font-family="Instrument Serif, Georgia, serif" font-style="italic" font-size="42" fill="#ff7a3d">07</text>' +
+        '<path d="M60 150 L80 150" stroke="rgba(255,255,255,.3)" stroke-width="1"/>' +
+        '<path d="M42 196 Q70 202 98 196" ' + SEAM + '/>';
+    }
+    var hanger = '<rect x="65" y="0" width="10" height="20" rx="4" fill="var(--walnut)"/>' +
+                 '<rect x="67" y="2" width="2" height="15" rx="1" fill="rgba(255,255,255,.22)"/>' +
+                 '<path d="M70 18 V28 L18 52 H122 L70 28" fill="none" stroke="var(--hanger)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>';
+    return '<svg viewBox="0 0 140 224" aria-hidden="true" focusable="false">' + hanger + out + '</svg>';
+  }
+
+  var railEl = document.getElementById('rail');
+  var host = document.getElementById('pieces');
+  var els = [];
+  var active = -1;
+
+  P.forEach(function (p, i) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'piece';
+    b.style.setProperty('--i', i);
+    b.setAttribute('aria-label', p.name + ', ₹' + p.price);
+    b.innerHTML = '<span class="sway">' + garment(p) + '</span>';
+    host.appendChild(b);
+    els.push(b);
+
+    b.addEventListener('pointerenter', function (e) {
+      if (e.pointerType === 'mouse' || e.pointerType === 'pen') setActive(i);
+    });
+    b.addEventListener('pointerleave', function (e) {
+      if ((e.pointerType === 'mouse' || e.pointerType === 'pen') && active === i) setActive(-1);
+    });
+    b.addEventListener('click', function (e) {
+      if (e.pointerType === 'mouse' || e.pointerType === 'pen') return;
+      setActive(active === i ? -1 : i);
+    });
+    b.addEventListener('focus', function () {
+      if (b.matches(':focus-visible')) setActive(i);
+    });
+    b.addEventListener('blur', function () {
+      if (active === i) setActive(-1);
+    });
+  });
+
+  document.addEventListener('pointerdown', function (e) {
+    if (e.pointerType === 'touch' && !e.target.closest('.piece')) setActive(-1);
+  });
+
+  function setActive(i) {
+    if (i === active) return;
+    active = i;
+    els.forEach(function (el, k) {
+      el.classList.toggle('is-active', k === i);
+      el.style.setProperty('--dir', i < 0 ? 0 : Math.sign(k - i));
+    });
+    railEl.classList.toggle('has-active', i >= 0);
+    if (i >= 0) {
+      var el = els[i];
+      railEl.style.setProperty('--gx', (el.offsetLeft + el.offsetWidth / 2) + 'px');
+    }
+  }
+})();
+</script>
+
+</body></html>
