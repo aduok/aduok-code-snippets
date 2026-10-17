@@ -1,0 +1,482 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Pull Lamp Login</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&family=Outfit:wght@500;600&display=swap">
+<style>
+  /* Layout: lamp on the left, glass login card on the right; stacks on phones.
+     Single deliberate dark look, so every color below is set explicitly. */
+  :root {
+    --bg: #0e0f12;
+    --fg: #f3efe4;
+    --muted: #9b9a94;
+    --glass: rgba(255, 255, 255, 0.06);
+    --glass-field: rgba(255, 255, 255, 0.07);
+    --stroke: rgba(255, 255, 255, 0.13);
+    --warm: 255 206 124;
+    --shade-off: #d8d3c3;
+    --shade-on: #fff6dc;
+    --pole-off: #c9c4b9;
+    --pole-on: #e6dfcd;
+    --cord: #6f6e6a;
+    --bead: #d3a96f;
+    --gold-ink: #1d1607;
+    --error: #ffa08c;
+    --font-display: "Outfit", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+    color-scheme: dark;
+  }
+
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font: 400 15px/1.5 var(--font-body);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 0;
+    overflow-x: clip;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+
+  .scene {
+    position: relative;
+    isolation: isolate;
+    min-height: 100%;
+    display: grid;
+    place-items: center;
+    padding-block: 32px;
+    overflow: clip;
+  }
+
+  .stage {
+    width: min(100%, 940px);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 380px);
+    align-items: center;
+    gap: clamp(24px, 7vw, 80px);
+  }
+
+  /* ---------- Lamp ---------- */
+  .lamp {
+    display: grid;
+    justify-items: center;
+    gap: 20px;
+  }
+  .lamp-art {
+    position: relative;
+    width: min(100%, 280px);
+    aspect-ratio: 240 / 340;
+  }
+  .lamp-art svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .glow {
+    position: absolute;
+    left: 50%;
+    top: 20%;
+    z-index: -1;
+    width: 200vmax;
+    height: 200vmax;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(
+      closest-side,
+      rgb(var(--warm) / 0.24),
+      rgb(var(--warm) / 0.08) 32%,
+      transparent 68%
+    );
+    opacity: 0;
+    transition: opacity 0.7s var(--ease);
+    pointer-events: none;
+  }
+
+  .shade { fill: var(--shade-off); transition: fill 0.4s var(--ease), filter 0.5s var(--ease); }
+  .pole  { fill: var(--pole-off);  transition: fill 0.4s var(--ease); }
+  .cone  { opacity: 0; transition: opacity 0.6s var(--ease); }
+
+  .cord { stroke: var(--cord); stroke-width: 1.6; stroke-linecap: round; }
+  .bead { fill: var(--bead); }
+  .ring { fill: none; stroke: var(--fg); stroke-width: 1.5; opacity: 0; }
+
+  #pull { cursor: grab; outline: none; touch-action: none; }
+  #pull.is-dragging { cursor: grabbing; }
+  #pull:focus-visible .ring { opacity: 0.9; }
+  #pull:hover .bead { filter: brightness(1.15); }
+
+  .scene[data-lit="true"] .glow { opacity: 1; }
+  .scene[data-lit="true"] .cone { opacity: 1; }
+  .scene[data-lit="true"] .shade {
+    fill: var(--shade-on);
+    filter: drop-shadow(0 0 16px rgb(var(--warm) / 0.75));
+  }
+  .scene[data-lit="true"] .pole { fill: var(--pole-on); }
+
+  .hint {
+    margin: 0;
+    min-height: 1.5em;
+    color: var(--muted);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: center;
+  }
+
+  /* ---------- Login card ---------- */
+  .card {
+    position: relative;
+    width: 100%;
+    padding: 32px 28px 28px;
+    border-radius: 24px;
+    border: 1px solid var(--stroke);
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+    box-shadow: 0 24px 60px rgb(0 0 0 / 0.45), inset 0 1px 0 rgb(255 255 255 / 0.08);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(14px) scale(0.98);
+    transition: opacity 0.5s var(--ease), transform 0.5s var(--ease), visibility 0s linear 0.5s;
+  }
+  .scene[data-lit="true"] .card {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    transition-delay: 0.12s, 0.12s, 0s;
+  }
+
+  .card h1 {
+    margin: 0 0 24px;
+    font: 600 24px/1.2 var(--font-display);
+    text-align: center;
+    letter-spacing: 0.01em;
+  }
+
+  form { display: grid; gap: 16px; }
+  .field { display: grid; gap: 6px; }
+  .field label { color: var(--muted); font-size: 12px; letter-spacing: 0.02em; }
+
+  .control { position: relative; }
+  .control input {
+    width: 100%;
+    height: 46px;
+    padding: 0 14px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    background: var(--glass-field);
+    color: var(--fg);
+    font: inherit;
+    transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+  }
+  .control input::placeholder { color: rgb(255 255 255 / 0.32); }
+  .control input:hover { background: rgb(255 255 255 / 0.09); }
+  .control input:focus-visible {
+    outline: none;
+    border-color: rgb(var(--warm) / 0.7);
+    box-shadow: 0 0 0 3px rgb(var(--warm) / 0.18);
+  }
+  .control input[aria-invalid="true"] { border-color: var(--error); }
+  .control input[type="password"], .control input#password { padding-right: 62px; }
+
+  .reveal {
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    transform: translateY(-50%);
+    padding: 6px 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    font: 500 12px var(--font-body);
+    cursor: pointer;
+  }
+  .reveal:hover { color: var(--fg); }
+  .reveal:focus-visible { outline: 2px solid rgb(var(--warm) / 0.8); outline-offset: 1px; }
+
+  .error { min-height: 0; margin: 0; color: var(--error); font-size: 12px; }
+  .error:empty { display: none; }
+
+  .submit {
+    height: 48px;
+    margin-top: 6px;
+    border: 0;
+    border-radius: 12px;
+    background: linear-gradient(115deg, #9c7429 0%, #f3dc98 32%, #b98a34 52%, #f1d47e 78%, #a37a2c 100%);
+    color: var(--gold-ink);
+    font: 600 15px var(--font-display);
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    box-shadow: 0 8px 22px rgb(var(--warm) / 0.18), inset 0 1px 0 rgb(255 255 255 / 0.4);
+    transition: transform 0.15s var(--ease), filter 0.2s;
+  }
+  .submit:hover { filter: brightness(1.08); }
+  .submit:active { transform: translateY(1px) scale(0.99); }
+  .submit:focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; }
+
+  .status { min-height: 1.5em; margin: 0; text-align: center; color: rgb(var(--warm)); font-size: 13px; }
+
+  /* ---------- Phones ---------- */
+  @media (max-width: 720px) {
+    .stage { grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 20px; }
+    .lamp-art { width: min(62vw, 210px); }
+    .card { max-width: 380px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: 0.01ms !important; transition-delay: 0s !important; }
+  }
+</style>
+
+<main class="scene" id="scene" data-lit="false">
+  <div class="stage">
+    <section class="lamp" aria-label="Table lamp">
+      <div class="lamp-art">
+        <div class="glow" aria-hidden="true"></div>
+        <svg id="lamp-svg" viewBox="0 0 240 340" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="cone-fade" gradientUnits="userSpaceOnUse" x1="0" y1="116" x2="0" y2="340">
+              <stop offset="0" stop-color="rgb(255,206,124)" stop-opacity="0.30" />
+              <stop offset="1" stop-color="rgb(255,206,124)" stop-opacity="0" />
+            </linearGradient>
+          </defs>
+
+          <path class="cone" d="M30 116 L210 116 L300 340 L-60 340 Z" fill="url(#cone-fade)" />
+          <rect class="pole" x="114" y="112" width="12" height="192" />
+          <rect class="pole" x="68" y="300" width="104" height="13" rx="6.5" />
+          <path class="shade" d="M20 112 C20 60 60 28 120 28 C180 28 220 60 220 112 Z" />
+
+          <line id="cord" class="cord" x1="162" y1="112" x2="162" y2="206" />
+          <g id="pull" role="switch" tabindex="0" aria-checked="false"
+             aria-label="Lamp pull string. Drag down or press Enter to switch the lamp.">
+            <g id="bead" transform="translate(162 206)">
+              <circle r="22" fill="transparent" />
+              <circle class="ring" r="12" />
+              <circle class="bead" r="6" />
+            </g>
+          </g>
+        </svg>
+      </div>
+      <p class="hint" id="hint">Pull the string to switch on the light</p>
+    </section>
+
+    <section class="card" id="card" aria-labelledby="card-title" inert>
+      <h1 id="card-title">Welcome</h1>
+      <form id="login-form" novalidate>
+        <div class="field">
+          <label for="username">Username</label>
+          <div class="control">
+            <input id="username" name="username" type="text" autocomplete="username"
+                   placeholder="Enter your username" aria-describedby="username-error" aria-invalid="false">
+          </div>
+          <p class="error" id="username-error"></p>
+        </div>
+
+        <div class="field">
+          <label for="password">Password</label>
+          <div class="control">
+            <input id="password" name="password" type="password" autocomplete="current-password"
+                   placeholder="Enter your password" aria-describedby="password-error" aria-invalid="false">
+            <button class="reveal" id="reveal" type="button" aria-pressed="false" aria-controls="password">Show</button>
+          </div>
+          <p class="error" id="password-error"></p>
+        </div>
+
+        <button class="submit" type="submit">Sign In</button>
+        <p class="status" id="status" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+  </div>
+</main>
+
+<script>
+(() => {
+  "use strict";
+
+  const $ = (id) => document.getElementById(id);
+  const scene = $("scene"), svg = $("lamp-svg"), pull = $("pull");
+  const cord = $("cord"), bead = $("bead"), hint = $("hint"), card = $("card");
+
+  /* Cord geometry (SVG units). The bead rests at REST and can be pulled down. */
+  const REST = { x: 162, y: 206 };
+  const MAX_PULL = 54;     // furthest the bead travels
+  const TRIGGER = 28;      // pull distance that clicks the switch
+  const TAP_SLOP = 4;      // pointer travel (px) that still counts as a tap
+  const SPRING = { k: 240, c: 14 };
+
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const offset = { x: 0, y: 0, vx: 0, vy: 0 };
+  let lit = false, dragging = false, fired = false, moved = 0;
+  let grab = { x: 0, y: 0 }, origin = { x: 0, y: 0 };
+  let raf = 0, lastTick = 0, audio = null;
+
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+  function toSvg(e) {
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    return pt.matrixTransform(svg.getScreenCTM().inverse());
+  }
+
+  function render() {
+    const x = REST.x + offset.x, y = REST.y + offset.y;
+    cord.setAttribute("x2", x);
+    cord.setAttribute("y2", y);
+    bead.setAttribute("transform", `translate(${x} ${y})`);
+  }
+
+  function click() {
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      const t = audio.currentTime;
+      const osc = audio.createOscillator(), gain = audio.createGain();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(900, t);
+      osc.frequency.exponentialRampToValueAtTime(140, t + 0.04);
+      gain.gain.setValueAtTime(0.04, t);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+      osc.connect(gain).connect(audio.destination);
+      osc.start(t);
+      osc.stop(t + 0.06);
+    } catch (_) { /* sound is optional */ }
+  }
+
+  function setLit(next) {
+    lit = next;
+    scene.dataset.lit = String(lit);
+    pull.setAttribute("aria-checked", String(lit));
+    card.inert = !lit;
+    hint.textContent = lit ? "Pull again to switch off" : "Pull the string to switch on the light";
+    if (!lit && card.contains(document.activeElement)) pull.focus();
+    click();
+  }
+
+  /* Damped spring that returns the cord to rest after a pull or a tug. */
+  function tick(now) {
+    const dt = Math.min((now - lastTick) / 1000, 0.032);
+    lastTick = now;
+    offset.vx += (-SPRING.k * offset.x - SPRING.c * offset.vx) * dt;
+    offset.vy += (-SPRING.k * offset.y - SPRING.c * offset.vy) * dt;
+    offset.x += offset.vx * dt;
+    offset.y += offset.vy * dt;
+    render();
+    const energy = Math.abs(offset.x) + Math.abs(offset.y) + Math.abs(offset.vx) + Math.abs(offset.vy);
+    if (energy < 0.05) {
+      offset.x = offset.y = offset.vx = offset.vy = 0;
+      render();
+      raf = 0;
+      return;
+    }
+    raf = requestAnimationFrame(tick);
+  }
+
+  function settle() {
+    cancelAnimationFrame(raf);
+    if (reduceMotion.matches) {
+      offset.x = offset.y = offset.vx = offset.vy = 0;
+      render();
+      return;
+    }
+    lastTick = performance.now();
+    raf = requestAnimationFrame(tick);
+  }
+
+  function tug() {
+    offset.x = 0;
+    offset.y = 0;
+    offset.vy = 520;
+    settle();
+  }
+
+  pull.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    e.preventDefault();
+    pull.setPointerCapture(e.pointerId);
+    cancelAnimationFrame(raf);
+    raf = 0;
+    const p = toSvg(e);
+    grab = { x: p.x - (REST.x + offset.x), y: p.y - (REST.y + offset.y) };
+    origin = { x: e.clientX, y: e.clientY };
+    offset.vx = offset.vy = 0;
+    dragging = true;
+    fired = false;
+    moved = 0;
+    pull.classList.add("is-dragging");
+    pull.focus({ preventScroll: true });
+  });
+
+  pull.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    const p = toSvg(e);
+    offset.y = clamp(p.y - grab.y - REST.y, 0, MAX_PULL);
+    offset.x = clamp((p.x - grab.x - REST.x) * 0.35, -10, 10);
+    moved = Math.max(moved, Math.hypot(e.clientX - origin.x, e.clientY - origin.y));
+    if (!fired && offset.y >= TRIGGER) {
+      fired = true;
+      setLit(!lit);
+    }
+    render();
+  });
+
+  function release(e) {
+    if (!dragging) return;
+    dragging = false;
+    pull.classList.remove("is-dragging");
+    if (e.type === "pointerup" && !fired && moved < TAP_SLOP) {
+      setLit(!lit);
+      tug();
+      return;
+    }
+    settle();
+  }
+  pull.addEventListener("pointerup", release);
+  pull.addEventListener("pointercancel", release);
+
+  pull.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    setLit(!lit);
+    tug();
+  });
+
+  /* ---------- Login form (front-end only, no real authentication) ---------- */
+  const form = $("login-form");
+  const user = $("username"), pass = $("password");
+  const userErr = $("username-error"), passErr = $("password-error");
+  const status = $("status"), reveal = $("reveal");
+
+  function setError(input, el, message) {
+    el.textContent = message;
+    input.setAttribute("aria-invalid", message ? "true" : "false");
+  }
+
+  reveal.addEventListener("click", () => {
+    const show = pass.type === "password";
+    pass.type = show ? "text" : "password";
+    reveal.textContent = show ? "Hide" : "Show";
+    reveal.setAttribute("aria-pressed", String(show));
+  });
+
+  user.addEventListener("input", () => setError(user, userErr, ""));
+  pass.addEventListener("input", () => setError(pass, passErr, ""));
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const name = user.value.trim();
+    setError(user, userErr, name ? "" : "Enter your username.");
+    setError(pass, passErr, pass.value ? "" : "Enter your password.");
+    status.textContent = "";
+    if (!name) return user.focus();
+    if (!pass.value) return pass.focus();
+    status.textContent = `Signed in as ${name}.`;
+  });
+
+  render();
+})();
+</script>
+
+</body></html>
