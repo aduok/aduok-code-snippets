@@ -1,0 +1,1971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Orbit — an interactive solar system explorer built with only HTML and CSS.">
+  <meta name="theme-color" content="#05060f">
+  <title>Orbit — Solar System Explorer</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+  <style>
+/* ==========================================================================
+   Orbit — Solar System Explorer (pure CSS, no JavaScript)
+
+   How it works
+   - Radio inputs hold the state; `:has()` reads the checked one.
+   - Selecting a planet sets `--active` (a registered <number>) on `.app`.
+     It transitions smoothly, and every slot derives its own distance
+     from it. Planets sit in a line receding into the screen (3D depth),
+     so changing planet flies the camera forward through the scene.
+   - Moons orbit using two nested elements animated on perpendicular axes.
+
+   Contents
+   1.  Registered properties & design tokens
+   2.  Base & layout shell
+   3.  Sky background
+   4.  Brand header & hint
+   5.  Planet navigation
+   6.  Depth scene (track & slots)
+   7.  Planet rendering (body, rings)
+   8.  Moons
+   9.  Slot text & call-to-action
+   10. Details drawer
+   11. Planet themes
+   12. State wiring (:has)
+   13. Keyframes
+   14. Responsive
+   15. Reduced motion
+   ========================================================================== */
+
+
+/* 1. Registered properties & design tokens
+   ========================================================================== */
+
+@property --active {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --accent {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #d6a58a;
+}
+
+:root {
+  /* Planet accents */
+  --mercury: #d6a58a;
+  --venus:   #f0a24b;
+  --earth:   #3fd0a8;
+  --mars:    #f26a4b;
+  --jupiter: #f0b36a;
+  --saturn:  #e3cb94;
+  --uranus:  #8fe1ea;
+  --neptune: #5b8cff;
+  --pluto:   #f4a76a;
+
+  /* Neutrals */
+  --bg:        #05060f;
+  --ink:       #eef0fb;
+  --ink-muted: rgb(238 240 251 / 0.66);
+  --ink-faint: rgb(238 240 251 / 0.42);
+  --line:      rgb(255 255 255 / 0.1);
+
+  /* Type */
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-body:    "Inter", system-ui, sans-serif;
+
+  /* Motion */
+  --ease-out:  cubic-bezier(0.22, 0.8, 0.2, 1);
+  --ease-move: cubic-bezier(0.65, 0, 0.25, 1);
+
+  /* Layout */
+  --base:        min(44dvh, 58vw);   /* diameter of a scale-1 planet */
+  --perspective: 900px;              /* camera distance */
+  --depth:       1800px;             /* gap between planets along the view axis */
+  --lift:        55dvh;              /* how far each farther planet rises on screen */
+  --planet-y:    40%;                /* planet centre inside the stage */
+  --info-bottom: 8dvh;               /* gap under the text block */
+}
+
+
+/* 2. Base & layout shell
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+label {
+  cursor: pointer;
+}
+
+.app {
+  --active: 0;
+  --accent: var(--mercury);
+
+  position: relative;
+  isolation: isolate;
+  height: 100dvh;
+  overflow: hidden;
+
+  transition:
+    --active 1.4s var(--ease-move),
+    --accent 1s ease;
+}
+
+
+
+/* 3. Sky background
+   ========================================================================== */
+
+.sky {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+
+  /* Three star layers, each tiled at a different size for depth */
+  background-image:
+    radial-gradient(1.5px 1.5px at  40px  60px, #fff 50%, transparent 51%),
+    radial-gradient(1px   1px   at 120px 200px, rgb(255 255 255 / 0.8) 50%, transparent 51%),
+    radial-gradient(1px   1px   at 200px  90px, rgb(255 255 255 / 0.7) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 170px 190px, rgb(190 210 255 / 0.9) 50%, transparent 51%),
+    radial-gradient(1px   1px   at 250px  60px, rgb(255 255 255 / 0.75) 50%, transparent 51%),
+    radial-gradient(1px   1px   at 330px 300px, rgb(255 230 210 / 0.8) 50%, transparent 51%);
+  background-size:
+    230px 260px, 310px 290px, 410px 380px,
+    230px 260px, 310px 290px, 410px 380px;
+  /* Parallax: the stars drift as the carousel moves */
+  background-position:
+    calc(var(--active) * -24px) 0, calc(var(--active) * -48px) 0, calc(var(--active) * -90px) 0,
+    calc(var(--active) * -24px) 0, calc(var(--active) * -48px) 0, calc(var(--active) * -90px) 0;
+}
+
+/* Nebula glow that takes on the colour of the selected planet */
+.sky::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(60rem 38rem at 50% 38%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 70%),
+    radial-gradient(40rem 30rem at 90% 95%, rgb(90 70 220 / 0.14), transparent 70%),
+    radial-gradient(ellipse at 50% 50%, transparent 55%, rgb(0 0 0 / 0.55) 100%);
+}
+
+/* Gentle twinkle */
+.sky::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1.5px 1.5px at  80px 140px, #fff 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 260px  40px, #fff 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 190px 260px, #fff 50%, transparent 51%);
+  background-size: 340px 300px, 450px 380px, 520px 420px;
+  animation: twinkle 5s ease-in-out infinite alternate;
+}
+
+
+/* 4. Brand header & hint
+   ========================================================================== */
+
+.brand {
+  position: fixed;
+  top: clamp(1rem, 3.5dvh, 2rem);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  text-align: center;
+  pointer-events: none;
+}
+
+.brand__name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.5em;
+  text-indent: 0.5em;
+  text-transform: uppercase;
+}
+
+.brand__sub {
+  margin: 0.25rem 0 0;
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.hint {
+  position: fixed;
+  right: clamp(1rem, 3vw, 2.5rem);
+  bottom: 1.5rem;
+  z-index: 5;
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+  pointer-events: none;
+}
+
+
+/* 5. Planet navigation
+   ========================================================================== */
+
+.nav {
+  position: fixed;
+  top: 50%;
+  left: clamp(1rem, 3vw, 2.5rem);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  translate: 0 -50%;
+  user-select: none;
+}
+
+/* Visually hidden but still focusable, so keyboard users can pick planets */
+.nav__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.nav__item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.35rem 1rem 0.35rem 0.35rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--ink-muted);
+  transition: background-color 0.3s, border-color 0.3s, color 0.3s;
+}
+
+.nav__item:hover {
+  background: rgb(255 255 255 / 0.05);
+  color: var(--ink);
+}
+
+.nav__input:focus-visible + .nav__item {
+  outline: 2px solid var(--hue);
+  outline-offset: 2px;
+}
+
+.nav__input:checked + .nav__item {
+  background: rgb(255 255 255 / 0.06);
+  border-color: color-mix(in srgb, var(--hue) 55%, transparent);
+  color: var(--ink);
+}
+
+.nav__orb {
+  position: relative;
+  flex: none;
+  width: 1.9rem;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--surface);
+  background-size: 100% 100%;
+  overflow: hidden;
+  transition: scale 0.3s var(--ease-out);
+}
+
+.nav__orb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at 30% 28%, transparent 0 25%, rgb(2 3 12 / 0.7) 85%);
+}
+
+.nav__input:checked + .nav__item .nav__orb {
+  scale: 1.12;
+}
+
+.nav__text {
+  display: grid;
+  line-height: 1.15;
+}
+
+.nav__name {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.nav__meta {
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  transition: color 0.3s;
+}
+
+.nav__input:checked + .nav__item .nav__meta {
+  color: var(--hue);
+}
+
+
+/* 6. Carousel (track & slots)
+   ========================================================================== */
+
+/* The stage is the camera: everything inside is laid out in 3D */
+.stage {
+  position: absolute;
+  inset: 0;
+  perspective: var(--perspective);
+  perspective-origin: 50% 38%;
+}
+
+.track {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+
+/* Slots only carry per-planet variables; their children (planet + text) are
+   placed straight into the 3D scene. */
+.slot {
+  /* Signed distance (in planets) ahead of the selected one; 0 = in focus */
+  --rel: calc(var(--i) - var(--active));
+  /* Absolute distance */
+  --d: max(var(--rel), calc(var(--rel) * -1));
+
+  display: contents;
+}
+
+/* 7. Planet rendering (body, rings)
+   ========================================================================== */
+
+.planet {
+  --size: calc(var(--base) * var(--scale));
+
+  position: absolute;
+  top: var(--planet-y);
+  left: 50%;
+  width: var(--size);
+  aspect-ratio: 1;
+  margin: calc(var(--size) / -2) 0 0 calc(var(--size) / -2);
+  isolation: isolate;                       /* keeps moon/ring layering local */
+  pointer-events: none;
+
+  /* Planets ahead recede and rise; the one in focus flies past the camera and
+     fades out as the next one arrives. */
+  translate:
+    0
+    calc(var(--rel) * var(--lift) * -1)
+    calc(var(--rel) * var(--depth) * -1);
+  opacity: min(calc(1 + var(--rel) * 2.5), calc(1 - var(--rel) * 0.6));
+}
+
+.planet__body {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 0 calc(var(--size) * 0.35) calc(var(--size) * -0.08) var(--glow);
+}
+
+/* Surface texture: double width, tiled at planet width, scrolled to spin */
+.planet__body::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 200%;
+  background: var(--surface);
+  background-size: 50% 100%;
+  background-repeat: repeat-x;
+  animation: planet-spin var(--spin, 120s) linear infinite;
+}
+
+/* Lighting: bright top-left, deep shadow bottom-right, thin atmosphere rim */
+.planet__body::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at 30% 28%,
+    transparent 0 26%,
+    rgb(2 3 12 / 0.55) 66%,
+    rgb(2 3 12 / 0.96) 100%
+  );
+  box-shadow: inset 0 0 calc(var(--size) * 0.06) var(--rim);
+}
+
+/* Rings are two clipped halves of one ellipse: the back half sits behind the
+   planet, the front half in front of it. */
+.planet__ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc(100% * var(--ring-scale, 2));
+  aspect-ratio: 1;
+  border-radius: 50%;
+  translate: -50% -50%;
+  rotate: var(--ring-tilt, -16deg);
+  transform: perspective(900px) rotateX(72deg);
+  background: var(--ring);
+}
+
+.planet__ring--back  { z-index: -1; clip-path: inset(0 0 50% 0); }
+.planet__ring--front { z-index: 1;  clip-path: inset(50% 0 0 0); }
+
+
+/* 8. Moons
+   ========================================================================== */
+
+/* Each moon is three nested layers:
+   .moon      → sweeps along X and flips its z-index (front/back of planet)
+   .moon__y   → sweeps along Y, a quarter period out of phase
+   .moon__body → the sphere itself
+   Two eased "alternate" sweeps on perpendicular axes trace an ellipse. */
+.moon {
+  --m:  max(8px, calc(var(--size) * var(--moon)));
+  --rx: calc(var(--size) * var(--orbit));
+  --ry: calc(var(--rx) * var(--flat, 0.2));
+
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+
+  animation:
+    moon-sweep-x calc(var(--period) / 2) ease-in-out infinite alternate,
+    moon-depth var(--period) linear infinite;
+  animation-delay: var(--phase), var(--phase);
+  animation-play-state: var(--moon-play, paused);
+}
+
+.moon__y {
+  position: absolute;
+  width: 0;
+  height: 0;
+  animation: moon-sweep-y calc(var(--period) / 2) ease-in-out infinite alternate;
+  animation-delay: calc(var(--phase) - var(--period) / 4);
+  animation-play-state: var(--moon-play, paused);
+}
+
+.moon__body {
+  position: absolute;
+  width: var(--m);
+  aspect-ratio: 1;
+  margin: calc(var(--m) / -2);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 32% 30%,
+    color-mix(in srgb, var(--tint) 65%, white),
+    var(--tint) 45%,
+    color-mix(in srgb, var(--tint) 25%, black) 100%
+  );
+  box-shadow: 0 0 0.6rem rgb(255 255 255 / 0.12);
+}
+
+/* Minor moons are a single element: the element sweeps along X and its
+   ::before (the sphere) sweeps along Y, which keeps hundreds of them cheap. */
+.moon--minor {
+  --m: max(3px, calc(var(--size) * var(--moon)));
+}
+
+.moon--minor::before {
+  content: "";
+  position: absolute;
+  width: var(--m);
+  aspect-ratio: 1;
+  margin: calc(var(--m) / -2);
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 30%, rgb(255 255 255 / 0.7), var(--tint, #b9b2a8) 60%);
+  animation: moon-sweep-y calc(var(--period) / 2) ease-in-out infinite alternate;
+  animation-delay: calc(var(--phase) - var(--period) / 4);
+  animation-play-state: var(--moon-play, paused);
+}
+
+.moon__label {
+  position: absolute;
+  top: calc(var(--m) / 2 + 0.25rem);
+  left: 0;
+  translate: -50% 0;
+  white-space: nowrap;
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--hue);
+  opacity: calc(1 - var(--d) * 2);
+}
+
+
+/* 9. Slot text & call-to-action
+   ========================================================================== */
+
+.slot__info {
+  position: absolute;
+  left: 50%;
+  bottom: var(--info-bottom);
+  width: min(100%, 34rem);
+  padding-inline: 1.25rem;
+  text-align: center;
+
+  opacity: calc(1 - var(--d) * 1.6);
+  translate: -50% calc(min(var(--d), 1) * 1.25rem);
+}
+
+.slot__eyebrow {
+  margin: 0 0 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--hue);
+}
+
+.slot__name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2.6rem, 7vw, 4.75rem);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.slot__tagline {
+  max-width: 30rem;
+  margin: 0.9rem auto 0;
+  font-size: clamp(0.9rem, 1.6vw, 1.02rem);
+  color: var(--ink-muted);
+}
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1.4rem;
+  padding: 0.8rem 1.45rem;
+  border-radius: 999px;
+  background: var(--hue);
+  box-shadow: 0 10px 30px -10px var(--hue);
+  color: #0a0c18;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: translate 0.25s var(--ease-out), box-shadow 0.25s;
+
+  /* Collapses to nothing on non-active slots so it can't be clicked by accident */
+  scale: max(0, calc(1 - var(--d) * 2));
+}
+
+.cta:hover {
+  translate: 0 -2px;
+  box-shadow: 0 16px 36px -10px var(--hue);
+}
+
+
+/* 10. Details drawer
+   ========================================================================== */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  background: rgb(3 4 12 / 0.55);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s;
+}
+
+.panel {
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: 20;
+  width: min(30rem, 100%);
+  padding: 1.25rem clamp(1.25rem, 4vw, 2.25rem) 3rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-left: 1px solid var(--line);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--hue) 16%, #0b0d1c),
+    #090b17 45%
+  );
+  box-shadow: -30px 0 80px rgb(0 0 0 / 0.5);
+
+  translate: 100% 0;
+  visibility: hidden;
+  transition: translate 0.6s var(--ease-out), visibility 0s 0.6s;
+}
+
+.panel__close {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: fit-content;
+  margin: 0 0 0 auto;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgb(10 12 24 / 0.7);
+  backdrop-filter: blur(8px);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  transition: border-color 0.2s;
+}
+
+.panel__close:hover {
+  border-color: var(--hue);
+}
+
+.panel__head {
+  margin-top: -0.5rem;
+}
+
+.panel__orb {
+  width: 4.5rem;
+  aspect-ratio: 1;
+  margin-bottom: 1.25rem;
+  border-radius: 50%;
+  background: var(--surface);
+  background-size: 100% 100%;
+  box-shadow: 0 0 40px -6px var(--glow);
+}
+
+.eyebrow {
+  margin: 0 0 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--hue);
+}
+
+.panel__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 2.6rem;
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.panel__lede {
+  margin: 1rem 0 0;
+  color: var(--ink-muted);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem;
+  margin: 1.75rem 0;
+}
+
+.stats > div {
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  background: rgb(255 255 255 / 0.035);
+}
+
+.stats dt {
+  font-size: 0.66rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.stats dd {
+  margin: 0.15rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.facts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: fact;
+}
+
+.facts li {
+  position: relative;
+  padding: 1.1rem 0 1.1rem 2.6rem;
+  border-top: 1px solid var(--line);
+  counter-increment: fact;
+}
+
+.facts li::before {
+  content: counter(fact, decimal-leading-zero);
+  position: absolute;
+  top: 1.2rem;
+  left: 0;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--hue);
+}
+
+.facts h3 {
+  margin: 0 0 0.25rem;
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  font-weight: 600;
+}
+
+.facts p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--ink-muted);
+}
+
+
+/* 11. Planet themes
+   Each theme provides: --hue (accent), --glow (outer halo), --rim (inner
+   atmosphere), --surface (texture, tiled at planet width) and, for ringed
+   planets, --ring.
+   ========================================================================== */
+
+.theme-mercury {
+  --hue:  var(--mercury);
+  --glow: rgb(214 165 138 / 0.4);
+  --rim:  rgb(255 225 205 / 0.3);
+  --surface:
+    radial-gradient(circle at 18% 32%, rgb(0 0 0 / 0.28) 0 5%, rgb(255 255 255 / 0.12) 5.6% 6.4%, transparent 7%),
+    radial-gradient(circle at 60% 58%, rgb(0 0 0 / 0.26) 0 8%, rgb(255 255 255 / 0.1) 8.7% 9.6%, transparent 10%),
+    radial-gradient(circle at 82% 24%, rgb(0 0 0 / 0.24) 0 4.5%, transparent 5.5%),
+    radial-gradient(circle at 36% 80%, rgb(0 0 0 / 0.25) 0 6%, transparent 7%),
+    radial-gradient(circle at 90% 70%, rgb(0 0 0 / 0.2) 0 3.5%, transparent 4.5%),
+    radial-gradient(circle at 46% 18%, rgb(0 0 0 / 0.18) 0 3%, transparent 4%),
+    linear-gradient(120deg, #a89a90, #766b64 55%, #8f837a);
+}
+
+.theme-venus {
+  --hue:  var(--venus);
+  --glow: rgb(240 162 75 / 0.45);
+  --rim:  rgb(255 220 160 / 0.45);
+  --surface:
+    radial-gradient(ellipse 40% 16% at 30% 30%, rgb(255 236 190 / 0.45), transparent),
+    radial-gradient(ellipse 45% 14% at 72% 62%, rgb(255 225 170 / 0.4), transparent),
+    repeating-linear-gradient(176deg, rgb(255 240 200 / 0.18) 0 4%, rgb(150 80 20 / 0.18) 4% 9%),
+    linear-gradient(180deg, #f0c27a, #d28f3e 55%, #b36a22);
+}
+
+.theme-earth {
+  --hue:  var(--earth);
+  --glow: rgb(90 170 255 / 0.5);
+  --rim:  rgb(140 200 255 / 0.55);
+  --surface:
+    linear-gradient(180deg, rgb(245 252 255 / 0.95) 0 5%, transparent 11% 89%, rgb(245 252 255 / 0.95) 95%),
+    radial-gradient(ellipse 16% 6% at 24% 34%, rgb(255 255 255 / 0.7), transparent),
+    radial-gradient(ellipse 18% 5% at 66% 48%, rgb(255 255 255 / 0.6), transparent),
+    radial-gradient(ellipse 14% 5% at 46% 72%, rgb(255 255 255 / 0.55), transparent),
+    radial-gradient(ellipse 13% 22% at 22% 40%, #3f9b57 0 70%, transparent 72%),
+    radial-gradient(ellipse 9% 18% at 31% 66%, #4aa35d 0 70%, transparent 72%),
+    radial-gradient(ellipse 16% 14% at 58% 36%, #7aa550 0 70%, transparent 72%),
+    radial-gradient(ellipse 10% 20% at 60% 62%, #c9b36a 0 70%, transparent 72%),
+    radial-gradient(ellipse 12% 10% at 82% 40%, #5a9a55 0 70%, transparent 72%),
+    linear-gradient(180deg, #1d62b0, #0f3f84);
+}
+
+.theme-mars {
+  --hue:  var(--mars);
+  --glow: rgb(242 106 75 / 0.4);
+  --rim:  rgb(255 160 130 / 0.4);
+  --surface:
+    linear-gradient(180deg, rgb(255 255 255 / 0.75) 0 4%, transparent 9%),
+    radial-gradient(ellipse 18% 12% at 28% 48%, rgb(70 25 15 / 0.5), transparent),
+    radial-gradient(ellipse 22% 10% at 64% 60%, rgb(70 25 15 / 0.42), transparent),
+    radial-gradient(ellipse 12% 8% at 82% 36%, rgb(70 25 15 / 0.4), transparent),
+    radial-gradient(ellipse 30% 12% at 46% 30%, rgb(255 170 120 / 0.25), transparent),
+    linear-gradient(180deg, #d8714a, #b04a2c);
+}
+
+.theme-jupiter {
+  --hue:  var(--jupiter);
+  --glow: rgb(240 179 106 / 0.35);
+  --rim:  rgb(255 230 190 / 0.35);
+  --surface:
+    radial-gradient(ellipse 10% 5.5% at 62% 67%, #b5472f 0 55%, rgb(181 71 47 / 0) 100%),
+    linear-gradient(
+      180deg,
+      #ead7b8 0%, #c68b57 8%, #f1e2c6 15%, #b8754a 24%, #ead7b8 33%, #c9976a 42%,
+      #f2e4ca 50%, #b9784c 60%, #e8d3b0 70%, #c58d5f 80%, #efdfc2 90%, #d0a273 100%
+    );
+}
+
+.theme-saturn {
+  --hue:  var(--saturn);
+  --glow: rgb(227 203 148 / 0.35);
+  --rim:  rgb(255 240 200 / 0.35);
+  --surface: linear-gradient(
+    180deg,
+    #d9c49a 0%, #c2a878 14%, #e6d4ad 30%, #bda070 48%, #e0cda6 62%, #c7ae82 80%, #a58c64 100%
+  );
+  /* The planet's body is ~50% of the ring element's width, so the ring
+     starts at 56% of its radius and ends at 98%. */
+  --ring: radial-gradient(
+    circle closest-side,
+    transparent 0 56%,
+    rgb(190 170 130 / 0.25) 57%,
+    rgb(225 205 165 / 0.9) 62%,
+    rgb(200 180 140 / 0.7) 70%,
+    rgb(20 14 8 / 0.15) 72%,
+    rgb(235 220 185 / 0.85) 76%,
+    rgb(205 185 145 / 0.65) 90%,
+    rgb(220 200 160 / 0.4) 97%,
+    transparent 98%
+  );
+}
+
+.theme-uranus {
+  --hue:  var(--uranus);
+  --glow: rgb(143 225 234 / 0.4);
+  --rim:  rgb(200 245 250 / 0.45);
+  --surface:
+    radial-gradient(ellipse 30% 6% at 30% 40%, rgb(255 255 255 / 0.18), transparent),
+    linear-gradient(180deg, #a8e3e8, #7cc7d3 50%, #9edde4);
+  --ring: radial-gradient(
+    circle closest-side,
+    transparent 0 58%,
+    rgb(210 240 245 / 0.55) 60%,
+    transparent 62%,
+    rgb(210 240 245 / 0.35) 80%,
+    transparent 82%,
+    rgb(210 240 245 / 0.3) 94%,
+    transparent 96%
+  );
+}
+
+.theme-neptune {
+  --hue:  var(--neptune);
+  --glow: rgb(91 140 255 / 0.5);
+  --rim:  rgb(150 190 255 / 0.5);
+  --surface:
+    radial-gradient(ellipse 14% 8% at 40% 45%, rgb(10 20 80 / 0.55), transparent),
+    radial-gradient(ellipse 12% 2% at 65% 30%, rgb(255 255 255 / 0.55), transparent),
+    radial-gradient(ellipse 10% 2% at 30% 62%, rgb(255 255 255 / 0.4), transparent),
+    linear-gradient(180deg, #4a73e0, #2f4fc0 50%, #3d62d3);
+}
+
+.theme-pluto {
+  --hue:  var(--pluto);
+  --glow: rgb(244 167 106 / 0.35);
+  --rim:  rgb(255 220 190 / 0.35);
+  --surface:
+    radial-gradient(ellipse 15% 13% at 38% 55%, rgb(250 242 230 / 0.95) 0 60%, transparent 100%),
+    radial-gradient(ellipse 12% 14% at 52% 52%, rgb(250 242 230 / 0.92) 0 60%, transparent 100%),
+    radial-gradient(ellipse 22% 14% at 78% 50%, rgb(90 50 35 / 0.5), transparent),
+    radial-gradient(ellipse 20% 12% at 12% 60%, rgb(100 60 40 / 0.45), transparent),
+    linear-gradient(180deg, #c8b09a, #a68872);
+}
+
+
+/* 12. State wiring (:has)
+   Picking a planet sets --active (its index) and --accent (its colour).
+   Opening a drawer reveals the panel and the backdrop.
+   ========================================================================== */
+
+.app:has(#mercury:checked) { --active: 0; --accent: var(--mercury); }
+.app:has(#venus:checked)   { --active: 1; --accent: var(--venus); }
+.app:has(#earth:checked)   { --active: 2; --accent: var(--earth); }
+.app:has(#mars:checked)    { --active: 3; --accent: var(--mars); }
+.app:has(#jupiter:checked) { --active: 4; --accent: var(--jupiter); }
+.app:has(#saturn:checked)  { --active: 5; --accent: var(--saturn); }
+.app:has(#uranus:checked)  { --active: 6; --accent: var(--uranus); }
+.app:has(#neptune:checked) { --active: 7; --accent: var(--neptune); }
+.app:has(#pluto:checked)   { --active: 8; --accent: var(--pluto); }
+
+/* Only the planet in focus animates its moons */
+.app:has(#earth:checked)   .theme-earth,
+.app:has(#mars:checked)    .theme-mars,
+.app:has(#jupiter:checked) .theme-jupiter,
+.app:has(#saturn:checked)  .theme-saturn,
+.app:has(#uranus:checked)  .theme-uranus,
+.app:has(#neptune:checked) .theme-neptune,
+.app:has(#pluto:checked)   .theme-pluto {
+  --moon-play: running;
+}
+
+.app:has(.panel__toggle:checked) .backdrop {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.panel:has(.panel__toggle:checked) {
+  translate: 0 0;
+  visibility: visible;
+  transition: translate 0.6s var(--ease-out), visibility 0s;
+}
+
+
+/* 13. Keyframes
+   ========================================================================== */
+
+@keyframes planet-spin {
+  to { transform: translateX(-50%); }
+}
+
+@keyframes moon-sweep-x {
+  from { translate: calc(var(--rx) * -1) 0; }
+  to   { translate: var(--rx) 0; }
+}
+
+@keyframes moon-sweep-y {
+  from { translate: 0 calc(var(--ry) * -1); }
+  to   { translate: 0 var(--ry); }
+}
+
+/* First half of the orbit passes in front of the planet, second half behind */
+@keyframes moon-depth {
+  0%, 49.99% { z-index: 2; }
+  50%, 100%  { z-index: -1; }
+}
+
+@keyframes twinkle {
+  from { opacity: 0.35; }
+  to   { opacity: 1; }
+}
+
+
+/* 14. Responsive
+   ========================================================================== */
+
+@media (max-height: 700px) {
+  :root {
+    --base: min(38dvh, 58vw);
+    --planet-y: 37%;
+    --info-bottom: 5dvh;
+  }
+}
+
+@media (max-width: 720px) {
+  :root {
+    --planet-y: 36%;
+    --info-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+
+  /* Planet list becomes a scrollable strip along the bottom */
+  .nav {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    flex-direction: row;
+    gap: 0.25rem;
+    padding: 1.5rem 0.75rem calc(0.75rem + env(safe-area-inset-bottom));
+    overflow-x: auto;
+    translate: none;
+    background: linear-gradient(transparent, rgb(5 6 15 / 0.92) 55%);
+    scrollbar-width: none;
+  }
+
+  .nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav__item {
+    flex: none;
+    padding-right: 0.8rem;
+  }
+
+  .nav__meta,
+  .hint {
+    display: none;
+  }
+
+  .panel {
+    padding-top: 1rem;
+  }
+}
+
+
+/* 15. Reduced motion
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    transition-delay: 0s !important;
+  }
+}
+  </style>
+</head>
+
+<body>
+  <!--
+    State lives in radio inputs (no JavaScript):
+      - name="planet" → which planet is centred (inside <nav>)
+      - name="panel"  → which details drawer is open (inside each .panel)
+    CSS reads the checked radio with :has() and drives everything from there.
+  -->
+  <div class="app">
+    <div class="sky" aria-hidden="true"></div>
+
+    <header class="brand">
+      <h1 class="brand__name">Orbit</h1>
+      <p class="brand__sub">Solar system explorer · pure CSS</p>
+    </header>
+
+    <!-- Planet picker -->
+    <nav class="nav" aria-label="Choose a planet">
+      <input class="nav__input" type="radio" name="planet" id="mercury" checked>
+      <label class="nav__item theme-mercury" for="mercury">
+        <span class="nav__orb" aria-hidden="true"></span>
+        <span class="nav__text"><span class="nav__name">Mercury</span><span class="nav__meta">0.39 AU</span></span>
+      </label>
+
+      <input class="nav__input" type="radio" name="planet" id="venus">
+      <label class="nav__item theme-venus" for="venus">
+        <span class="nav__orb" aria-hidden="true"></span>
+        <span class="nav__text"><span class="nav__name">Venus</span><span class="nav__meta">0.72 AU</span></span>
+      </label>
+
+      <input class="nav__input" type="radio" name="planet" id="earth">
+      <label class="nav__item theme-earth" for="earth">
+        <span class="nav__orb" aria-hidden="true"></span>
+        <span class="nav__text"><span class="nav__name">Earth</span><span class="nav__meta">1.00 AU</span></span>
+      </label>
+
+      <input class="nav__input" type="radio" name="planet" id="mars">
+      <label class="nav__item theme-mars" for="mars">
+        <span class="nav__orb" aria-hidden="true"></span>
+        <span class="nav__text"><span class="nav__name">Mars</span><span class="nav__meta">1.52 AU</span></span>
+      </label>
+
+      <input class="nav__input" type="radio" name="planet" id="jupiter">
+      <label class="nav__item theme-jupiter" for="jupiter">
+        <span class="nav__orb" aria-hidden="true"></span>
+        <span class="nav__text"><span class="nav__name">Jupiter</span><span class="nav__meta">5.20 AU</span></span>
+      </label>
+
+      <input class="nav__input" type="radio" name="planet" id="saturn">
+      <label class="nav__item theme-saturn" for="saturn">
+        <span class="nav__orb" aria-hidden="true"></span>
+        <span class="nav__text"><span class="nav__name">Saturn</span><span class="nav__meta">9.54 AU</span></span>
+      </label>
+
+      <input class="nav__input" type="radio" name="planet" id="uranus">
+      <label class="nav__item theme-uranus" for="uranus">
+        <span class="nav__orb" aria-hidden="true"></span>
+        <span class="nav__text"><span class="nav__name">Uranus</span><span class="nav__meta">19.19 AU</span></span>
+      </label>
+
+      <input class="nav__input" type="radio" name="planet" id="neptune">
+      <label class="nav__item theme-neptune" for="neptune">
+        <span class="nav__orb" aria-hidden="true"></span>
+        <span class="nav__text"><span class="nav__name">Neptune</span><span class="nav__meta">30.07 AU</span></span>
+      </label>
+
+      <input class="nav__input" type="radio" name="planet" id="pluto">
+      <label class="nav__item theme-pluto" for="pluto">
+        <span class="nav__orb" aria-hidden="true"></span>
+        <span class="nav__text"><span class="nav__name">Pluto</span><span class="nav__meta">39.5 AU</span></span>
+      </label>
+    </nav>
+
+    <!-- Planet carousel -->
+    <main class="stage">
+      <div class="track">
+
+        <!-- Mercury -->
+        <section class="slot theme-mercury" style="--i: 0" aria-labelledby="title-mercury">
+          <div class="planet" style="--scale: .42; --spin: 160s" aria-hidden="true">
+            <div class="planet__body"></div>
+          </div>
+          <div class="slot__info">
+            <p class="slot__eyebrow">Terrestrial planet · 0.39 AU</p>
+            <h2 class="slot__name" id="title-mercury">Mercury</h2>
+            <p class="slot__tagline">The swift messenger — the smallest planet, a world of craters and extremes.</p>
+            <label class="cta" for="read-mercury">Explore Mercury <span aria-hidden="true">→</span></label>
+          </div>
+        </section>
+
+        <!-- Venus -->
+        <section class="slot theme-venus" style="--i: 1" aria-labelledby="title-venus">
+          <div class="planet" style="--scale: .6; --spin: 220s" aria-hidden="true">
+            <div class="planet__body"></div>
+          </div>
+          <div class="slot__info">
+            <p class="slot__eyebrow">Terrestrial planet · 0.72 AU</p>
+            <h2 class="slot__name" id="title-venus">Venus</h2>
+            <p class="slot__tagline">A runaway greenhouse wrapped in sulfuric clouds — hotter even than Mercury.</p>
+            <label class="cta" for="read-venus">Explore Venus <span aria-hidden="true">→</span></label>
+          </div>
+        </section>
+
+        <!-- Earth -->
+        <section class="slot theme-earth" style="--i: 2" aria-labelledby="title-earth">
+          <div class="planet" style="--scale: .62; --spin: 90s" aria-hidden="true">
+            <div class="planet__body"></div>
+            <span class="moon" style="--orbit: .85; --moon: .2; --period: 16s; --phase: 0s; --tint: #cfcfd1">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Moon</span></span>
+            </span>
+          </div>
+          <div class="slot__info">
+            <p class="slot__eyebrow">Terrestrial planet · 1.00 AU</p>
+            <h2 class="slot__name" id="title-earth">Earth</h2>
+            <p class="slot__tagline">Our home — the only world known to host life.</p>
+            <label class="cta" for="read-earth">Explore Earth <span aria-hidden="true">→</span></label>
+          </div>
+        </section>
+
+        <!-- Mars -->
+        <section class="slot theme-mars" style="--i: 3" aria-labelledby="title-mars">
+          <div class="planet" style="--scale: .5; --spin: 100s" aria-hidden="true">
+            <div class="planet__body"></div>
+            <span class="moon" style="--orbit: .72; --moon: .09; --period: 7s; --phase: 0s; --tint: #8c7b6b">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Phobos</span></span>
+            </span>
+            <span class="moon" style="--orbit: 1; --moon: .07; --period: 13s; --phase: -4s; --tint: #a89786">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Deimos</span></span>
+            </span>
+          </div>
+          <div class="slot__info">
+            <p class="slot__eyebrow">Terrestrial planet · 1.52 AU</p>
+            <h2 class="slot__name" id="title-mars">Mars</h2>
+            <p class="slot__tagline">The Red Planet, home to the tallest volcano in the solar system.</p>
+            <label class="cta" for="read-mars">Explore Mars <span aria-hidden="true">→</span></label>
+          </div>
+        </section>
+
+        <!-- Jupiter -->
+        <section class="slot theme-jupiter" style="--i: 4" aria-labelledby="title-jupiter">
+          <div class="planet" style="--scale: 1; --spin: 60s" aria-hidden="true">
+            <div class="planet__body"></div>
+            <!-- 4 named moons + 111 minor moons = 115 -->
+            <span class="moon" style="--orbit: 0.68; --moon: 0.06; --period: 9s; --phase: 0s; --tint: #e8d27a">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Io</span></span>
+            </span>
+            <span class="moon" style="--orbit: 0.82; --moon: 0.055; --period: 15s; --phase: -3s; --tint: #d8c8b0">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Europa</span></span>
+            </span>
+            <span class="moon" style="--orbit: 0.98; --moon: 0.075; --period: 23s; --phase: -9s; --tint: #a8998a">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Ganymede</span></span>
+            </span>
+            <span class="moon" style="--orbit: 1.14; --moon: 0.07; --period: 34s; --phase: -14s; --tint: #7d7468">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Callisto</span></span>
+            </span>
+            <span class="moon moon--minor" style="--orbit: 0.9; --period: 27s; --phase: -18s; --flat: 0.1; --moon: 0.018; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.42; --period: 37s; --phase: -3s; --flat: 0.22; --moon: 0.014; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.35; --period: 34s; --phase: -8s; --flat: 0.29; --moon: 0.023; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.66; --period: 23s; --phase: -13s; --flat: 0.13; --moon: 0.016; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 0.89; --period: 37s; --phase: -7s; --flat: 0.28; --moon: 0.019; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.25; --period: 40s; --phase: -25s; --flat: 0.25; --moon: 0.018"></span>
+            <span class="moon moon--minor" style="--orbit: 1.03; --period: 41s; --phase: -15s; --flat: 0.16; --moon: 0.013"></span>
+            <span class="moon moon--minor" style="--orbit: 0.69; --period: 25s; --phase: -12s; --flat: 0.2; --moon: 0.017"></span>
+            <span class="moon moon--minor" style="--orbit: 0.68; --period: 28s; --phase: -5s; --flat: 0.2; --moon: 0.023; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.29; --period: 40s; --phase: -35s; --flat: 0.19; --moon: 0.02; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.32; --period: 33s; --phase: -3s; --flat: 0.17; --moon: 0.02; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.19; --period: 45s; --phase: -37s; --flat: 0.18; --moon: 0.016"></span>
+            <span class="moon moon--minor" style="--orbit: 0.64; --period: 27s; --phase: -5s; --flat: 0.12; --moon: 0.012"></span>
+            <span class="moon moon--minor" style="--orbit: 0.73; --period: 25s; --phase: -10s; --flat: 0.38; --moon: 0.012; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 0.86; --period: 26s; --phase: -11s; --flat: 0.27; --moon: 0.02"></span>
+            <span class="moon moon--minor" style="--orbit: 1.22; --period: 36s; --phase: -8s; --flat: 0.11; --moon: 0.013"></span>
+            <span class="moon moon--minor" style="--orbit: 0.63; --period: 33s; --phase: -6s; --flat: 0.18; --moon: 0.013; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.12; --period: 43s; --phase: -30s; --flat: 0.26; --moon: 0.019"></span>
+            <span class="moon moon--minor" style="--orbit: 0.67; --period: 34s; --phase: -27s; --flat: 0.38; --moon: 0.021; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.97; --period: 33s; --phase: -13s; --flat: 0.14; --moon: 0.024; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.92; --period: 25s; --phase: 0s; --flat: 0.13; --moon: 0.012; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.68; --period: 24s; --phase: -9s; --flat: 0.3; --moon: 0.023"></span>
+            <span class="moon moon--minor" style="--orbit: 1.04; --period: 29s; --phase: -14s; --flat: 0.41; --moon: 0.017; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.71; --period: 26s; --phase: -7s; --flat: 0.36; --moon: 0.013; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 0.94; --period: 36s; --phase: -33s; --flat: 0.34; --moon: 0.015"></span>
+            <span class="moon moon--minor" style="--orbit: 0.7; --period: 34s; --phase: -18s; --flat: 0.39; --moon: 0.016; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.31; --period: 37s; --phase: -8s; --flat: 0.36; --moon: 0.024"></span>
+            <span class="moon moon--minor" style="--orbit: 1.33; --period: 45s; --phase: -33s; --flat: 0.16; --moon: 0.018; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.49; --period: 47s; --phase: -22s; --flat: 0.15; --moon: 0.019; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.46; --period: 40s; --phase: -9s; --flat: 0.16; --moon: 0.014; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.49; --period: 45s; --phase: 0s; --flat: 0.39; --moon: 0.015"></span>
+            <span class="moon moon--minor" style="--orbit: 1.35; --period: 34s; --phase: -13s; --flat: 0.32; --moon: 0.014"></span>
+            <span class="moon moon--minor" style="--orbit: 1.0; --period: 36s; --phase: -3s; --flat: 0.4; --moon: 0.02; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.26; --period: 33s; --phase: -4s; --flat: 0.13; --moon: 0.023"></span>
+            <span class="moon moon--minor" style="--orbit: 0.75; --period: 35s; --phase: -34s; --flat: 0.3; --moon: 0.016; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.64; --period: 32s; --phase: -23s; --flat: 0.11; --moon: 0.021; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.35; --period: 36s; --phase: -9s; --flat: 0.18; --moon: 0.014; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.1; --period: 41s; --phase: -2s; --flat: 0.33; --moon: 0.023"></span>
+            <span class="moon moon--minor" style="--orbit: 1.34; --period: 40s; --phase: -33s; --flat: 0.38; --moon: 0.013; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 0.64; --period: 27s; --phase: -5s; --flat: 0.08; --moon: 0.021; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.16; --period: 31s; --phase: -2s; --flat: 0.31; --moon: 0.018; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.4; --period: 34s; --phase: -7s; --flat: 0.09; --moon: 0.012; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.29; --period: 46s; --phase: -20s; --flat: 0.29; --moon: 0.018; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.02; --period: 35s; --phase: -17s; --flat: 0.4; --moon: 0.02"></span>
+            <span class="moon moon--minor" style="--orbit: 1.45; --period: 38s; --phase: -21s; --flat: 0.4; --moon: 0.022; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.97; --period: 31s; --phase: -21s; --flat: 0.23; --moon: 0.014; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.41; --period: 36s; --phase: -26s; --flat: 0.3; --moon: 0.013"></span>
+            <span class="moon moon--minor" style="--orbit: 1.47; --period: 38s; --phase: -36s; --flat: 0.22; --moon: 0.017"></span>
+            <span class="moon moon--minor" style="--orbit: 1.35; --period: 35s; --phase: -15s; --flat: 0.26; --moon: 0.015; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.7; --period: 26s; --phase: -9s; --flat: 0.24; --moon: 0.02; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.17; --period: 37s; --phase: -2s; --flat: 0.41; --moon: 0.021"></span>
+            <span class="moon moon--minor" style="--orbit: 0.71; --period: 25s; --phase: -1s; --flat: 0.34; --moon: 0.015; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.37; --period: 43s; --phase: -41s; --flat: 0.22; --moon: 0.018; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.24; --period: 32s; --phase: -2s; --flat: 0.31; --moon: 0.017; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.18; --period: 42s; --phase: -4s; --flat: 0.37; --moon: 0.012"></span>
+            <span class="moon moon--minor" style="--orbit: 1.02; --period: 32s; --phase: -18s; --flat: 0.4; --moon: 0.014; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.24; --period: 45s; --phase: -44s; --flat: 0.17; --moon: 0.013"></span>
+            <span class="moon moon--minor" style="--orbit: 1.17; --period: 38s; --phase: -8s; --flat: 0.23; --moon: 0.02; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.5; --period: 36s; --phase: -1s; --flat: 0.25; --moon: 0.024; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.44; --period: 36s; --phase: -29s; --flat: 0.23; --moon: 0.017"></span>
+            <span class="moon moon--minor" style="--orbit: 0.97; --period: 34s; --phase: -23s; --flat: 0.41; --moon: 0.015"></span>
+            <span class="moon moon--minor" style="--orbit: 1.24; --period: 40s; --phase: -16s; --flat: 0.2; --moon: 0.012; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.17; --period: 43s; --phase: -19s; --flat: 0.1; --moon: 0.02; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.21; --period: 34s; --phase: -8s; --flat: 0.18; --moon: 0.017; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.62; --period: 25s; --phase: -8s; --flat: 0.41; --moon: 0.015; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.81; --period: 26s; --phase: -9s; --flat: 0.11; --moon: 0.015"></span>
+            <span class="moon moon--minor" style="--orbit: 0.84; --period: 36s; --phase: -3s; --flat: 0.36; --moon: 0.013; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.64; --period: 24s; --phase: -6s; --flat: 0.28; --moon: 0.018"></span>
+            <span class="moon moon--minor" style="--orbit: 1.2; --period: 41s; --phase: -36s; --flat: 0.21; --moon: 0.015"></span>
+            <span class="moon moon--minor" style="--orbit: 0.75; --period: 33s; --phase: -21s; --flat: 0.09; --moon: 0.022"></span>
+            <span class="moon moon--minor" style="--orbit: 1.17; --period: 41s; --phase: -33s; --flat: 0.13; --moon: 0.018; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.35; --period: 42s; --phase: -37s; --flat: 0.31; --moon: 0.02; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.66; --period: 30s; --phase: -29s; --flat: 0.21; --moon: 0.017; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.17; --period: 40s; --phase: -20s; --flat: 0.08; --moon: 0.021"></span>
+            <span class="moon moon--minor" style="--orbit: 1.06; --period: 36s; --phase: -24s; --flat: 0.1; --moon: 0.021; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.36; --period: 36s; --phase: -27s; --flat: 0.16; --moon: 0.019; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.69; --period: 35s; --phase: -10s; --flat: 0.1; --moon: 0.019; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 0.75; --period: 26s; --phase: -19s; --flat: 0.18; --moon: 0.018; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.05; --period: 42s; --phase: -4s; --flat: 0.15; --moon: 0.017"></span>
+            <span class="moon moon--minor" style="--orbit: 0.87; --period: 31s; --phase: -24s; --flat: 0.42; --moon: 0.018; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.44; --period: 34s; --phase: -16s; --flat: 0.36; --moon: 0.024; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.96; --period: 40s; --phase: -37s; --flat: 0.11; --moon: 0.012"></span>
+            <span class="moon moon--minor" style="--orbit: 0.85; --period: 29s; --phase: -17s; --flat: 0.29; --moon: 0.015; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.82; --period: 37s; --phase: -18s; --flat: 0.09; --moon: 0.011; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.98; --period: 37s; --phase: -15s; --flat: 0.21; --moon: 0.013; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.28; --period: 44s; --phase: -5s; --flat: 0.39; --moon: 0.02"></span>
+            <span class="moon moon--minor" style="--orbit: 0.88; --period: 30s; --phase: -12s; --flat: 0.42; --moon: 0.019; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.28; --period: 45s; --phase: -13s; --flat: 0.1; --moon: 0.02"></span>
+            <span class="moon moon--minor" style="--orbit: 0.75; --period: 37s; --phase: -16s; --flat: 0.19; --moon: 0.021"></span>
+            <span class="moon moon--minor" style="--orbit: 1.0; --period: 26s; --phase: -20s; --flat: 0.22; --moon: 0.022; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.25; --period: 31s; --phase: -23s; --flat: 0.23; --moon: 0.021"></span>
+            <span class="moon moon--minor" style="--orbit: 0.87; --period: 24s; --phase: -22s; --flat: 0.12; --moon: 0.017; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.85; --period: 35s; --phase: -23s; --flat: 0.22; --moon: 0.014; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.73; --period: 31s; --phase: -2s; --flat: 0.25; --moon: 0.022; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.42; --period: 50s; --phase: -22s; --flat: 0.13; --moon: 0.014; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.11; --period: 33s; --phase: -12s; --flat: 0.36; --moon: 0.014; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.96; --period: 37s; --phase: -8s; --flat: 0.17; --moon: 0.021; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.47; --period: 36s; --phase: -18s; --flat: 0.29; --moon: 0.022; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.41; --period: 40s; --phase: -26s; --flat: 0.23; --moon: 0.015"></span>
+            <span class="moon moon--minor" style="--orbit: 1.47; --period: 36s; --phase: -15s; --flat: 0.34; --moon: 0.021"></span>
+            <span class="moon moon--minor" style="--orbit: 1.05; --period: 28s; --phase: -26s; --flat: 0.4; --moon: 0.018; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.84; --period: 25s; --phase: -4s; --flat: 0.26; --moon: 0.02"></span>
+            <span class="moon moon--minor" style="--orbit: 1.26; --period: 41s; --phase: -31s; --flat: 0.24; --moon: 0.018; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.82; --period: 37s; --phase: -24s; --flat: 0.18; --moon: 0.013; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.23; --period: 32s; --phase: -2s; --flat: 0.26; --moon: 0.019; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.32; --period: 32s; --phase: -17s; --flat: 0.42; --moon: 0.015; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.04; --period: 30s; --phase: -7s; --flat: 0.41; --moon: 0.02; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.79; --period: 36s; --phase: -23s; --flat: 0.11; --moon: 0.014; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.82; --period: 23s; --phase: -8s; --flat: 0.22; --moon: 0.02; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.27; --period: 39s; --phase: -8s; --flat: 0.41; --moon: 0.015"></span>
+            <span class="moon moon--minor" style="--orbit: 0.82; --period: 26s; --phase: -20s; --flat: 0.18; --moon: 0.023; --tint: #9a928a"></span>
+          </div>
+          <div class="slot__info">
+            <p class="slot__eyebrow">Gas giant · 5.20 AU</p>
+            <h2 class="slot__name" id="title-jupiter">Jupiter</h2>
+            <p class="slot__tagline">So massive it outweighs every other planet in the solar system combined.</p>
+            <label class="cta" for="read-jupiter">Explore Jupiter <span aria-hidden="true">→</span></label>
+          </div>
+        </section>
+
+        <!-- Saturn -->
+        <section class="slot theme-saturn" style="--i: 5" aria-labelledby="title-saturn">
+          <div class="planet" style="--scale: .78; --spin: 70s; --ring-scale: 2; --ring-tilt: -16deg" aria-hidden="true">
+            <div class="planet__ring planet__ring--back"></div>
+            <div class="planet__body"></div>
+            <div class="planet__ring planet__ring--front"></div>
+            <!-- 7 named moons + 286 minor moons = 293 -->
+            <span class="moon" style="--orbit: 0.64; --moon: 0.03; --period: 7s; --phase: -2s; --tint: #d6d6d6">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Mimas</span></span>
+            </span>
+            <span class="moon" style="--orbit: 0.72; --moon: 0.04; --period: 10s; --phase: 0s; --tint: #f2f2f2">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Enceladus</span></span>
+            </span>
+            <span class="moon" style="--orbit: 0.82; --moon: 0.045; --period: 13s; --phase: -5s; --tint: #e8e8e8">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Tethys</span></span>
+            </span>
+            <span class="moon" style="--orbit: 0.92; --moon: 0.045; --period: 17s; --phase: -3s; --tint: #dedede">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Dione</span></span>
+            </span>
+            <span class="moon" style="--orbit: 1.0; --moon: 0.055; --period: 22s; --phase: -11s; --tint: #cfcac4">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Rhea</span></span>
+            </span>
+            <span class="moon" style="--orbit: 1.1; --moon: 0.08; --period: 28s; --phase: -8s; --tint: #e0a458">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Titan</span></span>
+            </span>
+            <span class="moon" style="--orbit: 1.3; --moon: 0.05; --period: 40s; --phase: -20s; --tint: #a89c8a">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Iapetus</span></span>
+            </span>
+            <span class="moon moon--minor" style="--orbit: 1.59; --period: 44s; --phase: -40s; --flat: 0.1; --moon: 0.019"></span>
+            <span class="moon moon--minor" style="--orbit: 0.72; --period: 21s; --phase: -13s; --flat: 0.22; --moon: 0.02; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.59; --period: 51s; --phase: -37s; --flat: 0.42; --moon: 0.023; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.34; --period: 41s; --phase: -19s; --flat: 0.19; --moon: 0.02"></span>
+            <span class="moon moon--minor" style="--orbit: 1.68; --period: 45s; --phase: -5s; --flat: 0.11; --moon: 0.012; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.24; --period: 42s; --phase: -16s; --flat: 0.34; --moon: 0.015"></span>
+            <span class="moon moon--minor" style="--orbit: 0.75; --period: 33s; --phase: -6s; --flat: 0.26; --moon: 0.017; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.69; --period: 27s; --phase: -22s; --flat: 0.34; --moon: 0.012; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.5; --period: 36s; --phase: -7s; --flat: 0.1; --moon: 0.019; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.66; --period: 48s; --phase: -13s; --flat: 0.32; --moon: 0.015; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.41; --period: 43s; --phase: -35s; --flat: 0.4; --moon: 0.012"></span>
+            <span class="moon moon--minor" style="--orbit: 0.77; --period: 33s; --phase: -15s; --flat: 0.34; --moon: 0.021"></span>
+            <span class="moon moon--minor" style="--orbit: 1.51; --period: 37s; --phase: -18s; --flat: 0.08; --moon: 0.023; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.29; --period: 36s; --phase: -12s; --flat: 0.2; --moon: 0.021; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.07; --period: 30s; --phase: -12s; --flat: 0.3; --moon: 0.017; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.68; --period: 52s; --phase: -51s; --flat: 0.17; --moon: 0.012; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.69; --period: 54s; --phase: -9s; --flat: 0.13; --moon: 0.017"></span>
+            <span class="moon moon--minor" style="--orbit: 0.9; --period: 33s; --phase: -26s; --flat: 0.34; --moon: 0.021; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.25; --period: 36s; --phase: -27s; --flat: 0.15; --moon: 0.014; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.95; --period: 40s; --phase: -8s; --flat: 0.1; --moon: 0.014; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 0.9; --period: 37s; --phase: -24s; --flat: 0.42; --moon: 0.012; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.53; --period: 50s; --phase: -2s; --flat: 0.18; --moon: 0.013; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 0.86; --period: 25s; --phase: -13s; --flat: 0.14; --moon: 0.019"></span>
+            <span class="moon moon--minor" style="--orbit: 1.35; --period: 32s; --phase: -20s; --flat: 0.32; --moon: 0.016; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.81; --period: 26s; --phase: -7s; --flat: 0.28; --moon: 0.019; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.51; --period: 42s; --phase: -16s; --flat: 0.29; --moon: 0.012; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.23; --period: 31s; --phase: -3s; --flat: 0.21; --moon: 0.018"></span>
+            <span class="moon moon--minor" style="--orbit: 0.75; --period: 24s; --phase: -17s; --flat: 0.22; --moon: 0.015; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.98; --period: 35s; --phase: -13s; --flat: 0.22; --moon: 0.022"></span>
+            <span class="moon moon--minor" style="--orbit: 1.04; --period: 30s; --phase: -22s; --flat: 0.15; --moon: 0.011"></span>
+            <span class="moon moon--minor" style="--orbit: 1.1; --period: 41s; --phase: -17s; --flat: 0.38; --moon: 0.017; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.71; --period: 23s; --phase: -19s; --flat: 0.21; --moon: 0.018"></span>
+            <span class="moon moon--minor" style="--orbit: 1.43; --period: 36s; --phase: -13s; --flat: 0.14; --moon: 0.013; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.17; --period: 42s; --phase: -41s; --flat: 0.15; --moon: 0.013"></span>
+            <span class="moon moon--minor" style="--orbit: 1.67; --period: 46s; --phase: -2s; --flat: 0.39; --moon: 0.016"></span>
+            <span class="moon moon--minor" style="--orbit: 1.31; --period: 45s; --phase: -7s; --flat: 0.35; --moon: 0.014; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.52; --period: 38s; --phase: -8s; --flat: 0.22; --moon: 0.018; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.82; --period: 38s; --phase: -31s; --flat: 0.15; --moon: 0.022"></span>
+            <span class="moon moon--minor" style="--orbit: 1.36; --period: 43s; --phase: -14s; --flat: 0.21; --moon: 0.017"></span>
+            <span class="moon moon--minor" style="--orbit: 1.47; --period: 45s; --phase: -14s; --flat: 0.16; --moon: 0.016; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.12; --period: 29s; --phase: -18s; --flat: 0.25; --moon: 0.014"></span>
+            <span class="moon moon--minor" style="--orbit: 1.47; --period: 42s; --phase: -8s; --flat: 0.24; --moon: 0.012; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.04; --period: 40s; --phase: -20s; --flat: 0.3; --moon: 0.012; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.47; --period: 43s; --phase: -2s; --flat: 0.25; --moon: 0.016"></span>
+            <span class="moon moon--minor" style="--orbit: 0.8; --period: 36s; --phase: -36s; --flat: 0.33; --moon: 0.022; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.96; --period: 38s; --phase: -30s; --flat: 0.31; --moon: 0.02; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.29; --period: 35s; --phase: -11s; --flat: 0.29; --moon: 0.023; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.18; --period: 44s; --phase: -9s; --flat: 0.17; --moon: 0.018; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.87; --period: 30s; --phase: -19s; --flat: 0.17; --moon: 0.015; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.78; --period: 31s; --phase: -20s; --flat: 0.2; --moon: 0.022; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.38; --period: 47s; --phase: -12s; --flat: 0.26; --moon: 0.022"></span>
+            <span class="moon moon--minor" style="--orbit: 1.05; --period: 33s; --phase: -12s; --flat: 0.13; --moon: 0.015; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.84; --period: 35s; --phase: -2s; --flat: 0.36; --moon: 0.014"></span>
+            <span class="moon moon--minor" style="--orbit: 1.68; --period: 48s; --phase: -32s; --flat: 0.19; --moon: 0.011; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.96; --period: 35s; --phase: -15s; --flat: 0.2; --moon: 0.012; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.34; --period: 32s; --phase: 0s; --flat: 0.2; --moon: 0.012; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.09; --period: 32s; --phase: -4s; --flat: 0.2; --moon: 0.022; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.63; --period: 41s; --phase: -6s; --flat: 0.11; --moon: 0.019"></span>
+            <span class="moon moon--minor" style="--orbit: 1.47; --period: 41s; --phase: -11s; --flat: 0.08; --moon: 0.019; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.28; --period: 40s; --phase: -24s; --flat: 0.26; --moon: 0.017; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.71; --period: 29s; --phase: -12s; --flat: 0.16; --moon: 0.012"></span>
+            <span class="moon moon--minor" style="--orbit: 0.67; --period: 29s; --phase: -27s; --flat: 0.13; --moon: 0.014"></span>
+            <span class="moon moon--minor" style="--orbit: 1.19; --period: 40s; --phase: -33s; --flat: 0.14; --moon: 0.015; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.69; --period: 50s; --phase: -24s; --flat: 0.26; --moon: 0.016; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.74; --period: 32s; --phase: -6s; --flat: 0.42; --moon: 0.014"></span>
+            <span class="moon moon--minor" style="--orbit: 0.79; --period: 36s; --phase: -33s; --flat: 0.4; --moon: 0.014; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.37; --period: 44s; --phase: -40s; --flat: 0.41; --moon: 0.015"></span>
+            <span class="moon moon--minor" style="--orbit: 1.59; --period: 38s; --phase: -19s; --flat: 0.14; --moon: 0.023"></span>
+            <span class="moon moon--minor" style="--orbit: 0.87; --period: 26s; --phase: -24s; --flat: 0.15; --moon: 0.016"></span>
+            <span class="moon moon--minor" style="--orbit: 1.05; --period: 41s; --phase: -38s; --flat: 0.41; --moon: 0.022; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.53; --period: 47s; --phase: -40s; --flat: 0.23; --moon: 0.02; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.48; --period: 41s; --phase: -24s; --flat: 0.27; --moon: 0.013; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.77; --period: 37s; --phase: -13s; --flat: 0.13; --moon: 0.011; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.38; --period: 45s; --phase: -3s; --flat: 0.28; --moon: 0.016"></span>
+            <span class="moon moon--minor" style="--orbit: 1.51; --period: 49s; --phase: -3s; --flat: 0.38; --moon: 0.023"></span>
+            <span class="moon moon--minor" style="--orbit: 0.77; --period: 25s; --phase: -3s; --flat: 0.09; --moon: 0.022"></span>
+            <span class="moon moon--minor" style="--orbit: 1.32; --period: 45s; --phase: -28s; --flat: 0.18; --moon: 0.012; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.97; --period: 31s; --phase: -8s; --flat: 0.2; --moon: 0.023; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.61; --period: 49s; --phase: -29s; --flat: 0.24; --moon: 0.015"></span>
+            <span class="moon moon--minor" style="--orbit: 1.48; --period: 35s; --phase: -18s; --flat: 0.11; --moon: 0.017; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 0.89; --period: 38s; --phase: -3s; --flat: 0.36; --moon: 0.013; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.96; --period: 37s; --phase: -2s; --flat: 0.2; --moon: 0.012"></span>
+            <span class="moon moon--minor" style="--orbit: 1.52; --period: 51s; --phase: -30s; --flat: 0.41; --moon: 0.018; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.96; --period: 29s; --phase: -20s; --flat: 0.25; --moon: 0.012"></span>
+            <span class="moon moon--minor" style="--orbit: 0.74; --period: 34s; --phase: -24s; --flat: 0.35; --moon: 0.019; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.63; --period: 52s; --phase: -39s; --flat: 0.22; --moon: 0.019; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.93; --period: 39s; --phase: -20s; --flat: 0.21; --moon: 0.022; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.79; --period: 32s; --phase: -22s; --flat: 0.29; --moon: 0.011; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 0.82; --period: 36s; --phase: -24s; --flat: 0.33; --moon: 0.013; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.26; --period: 33s; --phase: -15s; --flat: 0.38; --moon: 0.014; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.44; --period: 47s; --phase: -29s; --flat: 0.33; --moon: 0.024"></span>
+            <span class="moon moon--minor" style="--orbit: 1.29; --period: 37s; --phase: -9s; --flat: 0.4; --moon: 0.014"></span>
+            <span class="moon moon--minor" style="--orbit: 1.69; --period: 41s; --phase: -27s; --flat: 0.15; --moon: 0.013; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.42; --period: 41s; --phase: -8s; --flat: 0.3; --moon: 0.012; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.14; --period: 29s; --phase: -25s; --flat: 0.23; --moon: 0.014"></span>
+            <span class="moon moon--minor" style="--orbit: 0.97; --period: 26s; --phase: -7s; --flat: 0.33; --moon: 0.011; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.39; --period: 42s; --phase: -27s; --flat: 0.37; --moon: 0.02"></span>
+            <span class="moon moon--minor" style="--orbit: 1.57; --period: 47s; --phase: -27s; --flat: 0.16; --moon: 0.013; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.99; --period: 36s; --phase: -4s; --flat: 0.22; --moon: 0.021"></span>
+            <span class="moon moon--minor" style="--orbit: 1.31; --period: 36s; --phase: -15s; --flat: 0.23; --moon: 0.019; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.59; --period: 42s; --phase: 0s; --flat: 0.36; --moon: 0.023; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.23; --period: 33s; --phase: -26s; --flat: 0.4; --moon: 0.018; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.14; --period: 32s; --phase: -15s; --flat: 0.09; --moon: 0.021; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.09; --period: 43s; --phase: -9s; --flat: 0.31; --moon: 0.016"></span>
+            <span class="moon moon--minor" style="--orbit: 0.79; --period: 38s; --phase: -14s; --flat: 0.1; --moon: 0.015; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.74; --period: 36s; --phase: -23s; --flat: 0.31; --moon: 0.019; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.43; --period: 49s; --phase: -26s; --flat: 0.15; --moon: 0.021; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.83; --period: 38s; --phase: -3s; --flat: 0.35; --moon: 0.014"></span>
+            <span class="moon moon--minor" style="--orbit: 1.41; --period: 46s; --phase: -7s; --flat: 0.31; --moon: 0.022"></span>
+            <span class="moon moon--minor" style="--orbit: 1.09; --period: 44s; --phase: -33s; --flat: 0.3; --moon: 0.021; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.94; --period: 31s; --phase: -8s; --flat: 0.22; --moon: 0.013; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.03; --period: 37s; --phase: -12s; --flat: 0.24; --moon: 0.019; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.82; --period: 28s; --phase: -11s; --flat: 0.11; --moon: 0.018; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.21; --period: 35s; --phase: -20s; --flat: 0.3; --moon: 0.014; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.92; --period: 26s; --phase: -4s; --flat: 0.16; --moon: 0.021; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.88; --period: 30s; --phase: -16s; --flat: 0.29; --moon: 0.02"></span>
+            <span class="moon moon--minor" style="--orbit: 0.75; --period: 36s; --phase: -20s; --flat: 0.3; --moon: 0.015; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.21; --period: 42s; --phase: -18s; --flat: 0.38; --moon: 0.018; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.52; --period: 43s; --phase: -24s; --flat: 0.24; --moon: 0.023"></span>
+            <span class="moon moon--minor" style="--orbit: 0.92; --period: 27s; --phase: -16s; --flat: 0.33; --moon: 0.013; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.18; --period: 34s; --phase: -16s; --flat: 0.22; --moon: 0.024"></span>
+            <span class="moon moon--minor" style="--orbit: 0.85; --period: 29s; --phase: -19s; --flat: 0.09; --moon: 0.012"></span>
+            <span class="moon moon--minor" style="--orbit: 1.7; --period: 52s; --phase: -5s; --flat: 0.24; --moon: 0.021; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.41; --period: 43s; --phase: -15s; --flat: 0.37; --moon: 0.016; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.24; --period: 45s; --phase: -13s; --flat: 0.2; --moon: 0.014; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.96; --period: 39s; --phase: -16s; --flat: 0.25; --moon: 0.015; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.34; --period: 45s; --phase: -15s; --flat: 0.19; --moon: 0.015; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.48; --period: 35s; --phase: -25s; --flat: 0.38; --moon: 0.018; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.77; --period: 23s; --phase: -19s; --flat: 0.24; --moon: 0.021; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.61; --period: 47s; --phase: -29s; --flat: 0.29; --moon: 0.02; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.88; --period: 35s; --phase: -16s; --flat: 0.34; --moon: 0.012; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.1; --period: 29s; --phase: -27s; --flat: 0.08; --moon: 0.022; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.24; --period: 34s; --phase: -10s; --flat: 0.22; --moon: 0.015; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.63; --period: 38s; --phase: -22s; --flat: 0.09; --moon: 0.013"></span>
+            <span class="moon moon--minor" style="--orbit: 1.26; --period: 45s; --phase: -20s; --flat: 0.08; --moon: 0.016; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.15; --period: 35s; --phase: -4s; --flat: 0.3; --moon: 0.014; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.1; --period: 28s; --phase: -19s; --flat: 0.42; --moon: 0.022; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.79; --period: 23s; --phase: -17s; --flat: 0.16; --moon: 0.021; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.04; --period: 39s; --phase: -27s; --flat: 0.13; --moon: 0.021; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.4; --period: 41s; --phase: -38s; --flat: 0.17; --moon: 0.024"></span>
+            <span class="moon moon--minor" style="--orbit: 0.67; --period: 20s; --phase: -13s; --flat: 0.36; --moon: 0.012; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 0.83; --period: 37s; --phase: -18s; --flat: 0.1; --moon: 0.016; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.15; --period: 31s; --phase: -30s; --flat: 0.12; --moon: 0.023; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.16; --period: 41s; --phase: -19s; --flat: 0.17; --moon: 0.021; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.72; --period: 37s; --phase: -26s; --flat: 0.36; --moon: 0.015"></span>
+            <span class="moon moon--minor" style="--orbit: 1.68; --period: 52s; --phase: -31s; --flat: 0.18; --moon: 0.017"></span>
+            <span class="moon moon--minor" style="--orbit: 1.05; --period: 38s; --phase: -23s; --flat: 0.38; --moon: 0.021; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.99; --period: 30s; --phase: -5s; --flat: 0.39; --moon: 0.021"></span>
+            <span class="moon moon--minor" style="--orbit: 0.96; --period: 28s; --phase: -25s; --flat: 0.42; --moon: 0.013"></span>
+            <span class="moon moon--minor" style="--orbit: 1.49; --period: 44s; --phase: -34s; --flat: 0.25; --moon: 0.018; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.49; --period: 38s; --phase: -29s; --flat: 0.4; --moon: 0.014"></span>
+            <span class="moon moon--minor" style="--orbit: 1.36; --period: 40s; --phase: -8s; --flat: 0.17; --moon: 0.021"></span>
+            <span class="moon moon--minor" style="--orbit: 1.14; --period: 30s; --phase: -24s; --flat: 0.34; --moon: 0.014; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.58; --period: 45s; --phase: -21s; --flat: 0.28; --moon: 0.013; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.5; --period: 40s; --phase: -23s; --flat: 0.2; --moon: 0.021"></span>
+            <span class="moon moon--minor" style="--orbit: 0.92; --period: 39s; --phase: -19s; --flat: 0.37; --moon: 0.016; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.82; --period: 32s; --phase: -11s; --flat: 0.26; --moon: 0.011; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.17; --period: 38s; --phase: -10s; --flat: 0.34; --moon: 0.017"></span>
+            <span class="moon moon--minor" style="--orbit: 1.46; --period: 47s; --phase: -45s; --flat: 0.17; --moon: 0.011; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.05; --period: 27s; --phase: -1s; --flat: 0.21; --moon: 0.02; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.56; --period: 46s; --phase: -42s; --flat: 0.32; --moon: 0.012; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.33; --period: 47s; --phase: -31s; --flat: 0.21; --moon: 0.017; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.69; --period: 42s; --phase: -2s; --flat: 0.17; --moon: 0.016"></span>
+            <span class="moon moon--minor" style="--orbit: 1.6; --period: 50s; --phase: -2s; --flat: 0.35; --moon: 0.02"></span>
+            <span class="moon moon--minor" style="--orbit: 1.68; --period: 39s; --phase: -6s; --flat: 0.34; --moon: 0.023"></span>
+            <span class="moon moon--minor" style="--orbit: 0.97; --period: 35s; --phase: -27s; --flat: 0.12; --moon: 0.015; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.05; --period: 33s; --phase: -15s; --flat: 0.35; --moon: 0.023"></span>
+            <span class="moon moon--minor" style="--orbit: 1.15; --period: 43s; --phase: -34s; --flat: 0.13; --moon: 0.022; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.56; --period: 50s; --phase: -7s; --flat: 0.23; --moon: 0.012"></span>
+            <span class="moon moon--minor" style="--orbit: 1.54; --period: 46s; --phase: -21s; --flat: 0.2; --moon: 0.022; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.81; --period: 26s; --phase: -1s; --flat: 0.32; --moon: 0.018; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.94; --period: 32s; --phase: -5s; --flat: 0.17; --moon: 0.022; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.93; --period: 26s; --phase: -12s; --flat: 0.24; --moon: 0.013; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.24; --period: 44s; --phase: -5s; --flat: 0.34; --moon: 0.024; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.7; --period: 53s; --phase: -5s; --flat: 0.18; --moon: 0.023; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.81; --period: 33s; --phase: -15s; --flat: 0.25; --moon: 0.018; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 0.96; --period: 31s; --phase: -1s; --flat: 0.22; --moon: 0.015; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.2; --period: 33s; --phase: -6s; --flat: 0.28; --moon: 0.022"></span>
+            <span class="moon moon--minor" style="--orbit: 1.42; --period: 46s; --phase: -8s; --flat: 0.13; --moon: 0.02"></span>
+            <span class="moon moon--minor" style="--orbit: 0.86; --period: 28s; --phase: 0s; --flat: 0.32; --moon: 0.018"></span>
+            <span class="moon moon--minor" style="--orbit: 1.61; --period: 45s; --phase: -16s; --flat: 0.18; --moon: 0.019"></span>
+            <span class="moon moon--minor" style="--orbit: 0.75; --period: 28s; --phase: -21s; --flat: 0.13; --moon: 0.02; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.52; --period: 41s; --phase: -7s; --flat: 0.21; --moon: 0.019; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.63; --period: 53s; --phase: -4s; --flat: 0.2; --moon: 0.014"></span>
+            <span class="moon moon--minor" style="--orbit: 1.61; --period: 49s; --phase: -43s; --flat: 0.28; --moon: 0.023; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.65; --period: 46s; --phase: -24s; --flat: 0.26; --moon: 0.018; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.89; --period: 27s; --phase: -3s; --flat: 0.17; --moon: 0.022; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.62; --period: 49s; --phase: -13s; --flat: 0.36; --moon: 0.019; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.39; --period: 35s; --phase: -30s; --flat: 0.32; --moon: 0.012; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.27; --period: 43s; --phase: -5s; --flat: 0.12; --moon: 0.022; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.56; --period: 38s; --phase: -22s; --flat: 0.33; --moon: 0.013"></span>
+            <span class="moon moon--minor" style="--orbit: 1.64; --period: 44s; --phase: -19s; --flat: 0.37; --moon: 0.018; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.47; --period: 40s; --phase: -10s; --flat: 0.19; --moon: 0.017"></span>
+            <span class="moon moon--minor" style="--orbit: 1.5; --period: 50s; --phase: -41s; --flat: 0.37; --moon: 0.012; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.92; --period: 31s; --phase: -20s; --flat: 0.2; --moon: 0.018; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.87; --period: 34s; --phase: -8s; --flat: 0.22; --moon: 0.016"></span>
+            <span class="moon moon--minor" style="--orbit: 1.13; --period: 29s; --phase: -28s; --flat: 0.41; --moon: 0.012"></span>
+            <span class="moon moon--minor" style="--orbit: 1.31; --period: 46s; --phase: -29s; --flat: 0.29; --moon: 0.021; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.92; --period: 33s; --phase: -14s; --flat: 0.4; --moon: 0.015; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.79; --period: 32s; --phase: -31s; --flat: 0.25; --moon: 0.014; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.63; --period: 44s; --phase: -23s; --flat: 0.38; --moon: 0.023; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.91; --period: 26s; --phase: -14s; --flat: 0.37; --moon: 0.019; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.87; --period: 35s; --phase: -16s; --flat: 0.27; --moon: 0.019; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.69; --period: 26s; --phase: -5s; --flat: 0.27; --moon: 0.024; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.83; --period: 38s; --phase: -12s; --flat: 0.19; --moon: 0.015"></span>
+            <span class="moon moon--minor" style="--orbit: 0.88; --period: 25s; --phase: -1s; --flat: 0.27; --moon: 0.019; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.2; --period: 43s; --phase: -15s; --flat: 0.34; --moon: 0.018"></span>
+            <span class="moon moon--minor" style="--orbit: 1.36; --period: 47s; --phase: -20s; --flat: 0.31; --moon: 0.013; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.54; --period: 49s; --phase: -25s; --flat: 0.33; --moon: 0.021"></span>
+            <span class="moon moon--minor" style="--orbit: 1.15; --period: 41s; --phase: -29s; --flat: 0.39; --moon: 0.013"></span>
+            <span class="moon moon--minor" style="--orbit: 0.66; --period: 32s; --phase: -19s; --flat: 0.25; --moon: 0.024; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.54; --period: 40s; --phase: -25s; --flat: 0.12; --moon: 0.022"></span>
+            <span class="moon moon--minor" style="--orbit: 0.96; --period: 31s; --phase: -11s; --flat: 0.26; --moon: 0.019"></span>
+            <span class="moon moon--minor" style="--orbit: 0.67; --period: 32s; --phase: -32s; --flat: 0.21; --moon: 0.015; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.11; --period: 34s; --phase: -8s; --flat: 0.36; --moon: 0.015"></span>
+            <span class="moon moon--minor" style="--orbit: 1.29; --period: 35s; --phase: -11s; --flat: 0.41; --moon: 0.023"></span>
+            <span class="moon moon--minor" style="--orbit: 0.69; --period: 25s; --phase: -22s; --flat: 0.18; --moon: 0.018; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.7; --period: 47s; --phase: -24s; --flat: 0.31; --moon: 0.016; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.36; --period: 40s; --phase: 0s; --flat: 0.1; --moon: 0.014; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.08; --period: 36s; --phase: -21s; --flat: 0.38; --moon: 0.024; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.46; --period: 49s; --phase: -29s; --flat: 0.32; --moon: 0.021; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.99; --period: 41s; --phase: -34s; --flat: 0.25; --moon: 0.012"></span>
+            <span class="moon moon--minor" style="--orbit: 1.38; --period: 46s; --phase: -46s; --flat: 0.38; --moon: 0.016; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.51; --period: 39s; --phase: -35s; --flat: 0.22; --moon: 0.012; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.03; --period: 42s; --phase: -27s; --flat: 0.09; --moon: 0.016"></span>
+            <span class="moon moon--minor" style="--orbit: 0.98; --period: 37s; --phase: 0s; --flat: 0.18; --moon: 0.022; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.86; --period: 31s; --phase: -17s; --flat: 0.17; --moon: 0.019; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.26; --period: 37s; --phase: -4s; --flat: 0.13; --moon: 0.021; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.74; --period: 36s; --phase: -18s; --flat: 0.24; --moon: 0.017"></span>
+            <span class="moon moon--minor" style="--orbit: 1.34; --period: 43s; --phase: -25s; --flat: 0.13; --moon: 0.014; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.94; --period: 27s; --phase: -24s; --flat: 0.28; --moon: 0.016; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.68; --period: 24s; --phase: -10s; --flat: 0.34; --moon: 0.012; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.92; --period: 25s; --phase: -23s; --flat: 0.37; --moon: 0.015"></span>
+            <span class="moon moon--minor" style="--orbit: 1.51; --period: 40s; --phase: -24s; --flat: 0.41; --moon: 0.017"></span>
+            <span class="moon moon--minor" style="--orbit: 0.91; --period: 31s; --phase: -22s; --flat: 0.16; --moon: 0.015"></span>
+            <span class="moon moon--minor" style="--orbit: 1.16; --period: 42s; --phase: -10s; --flat: 0.14; --moon: 0.016; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.07; --period: 33s; --phase: -11s; --flat: 0.38; --moon: 0.015"></span>
+            <span class="moon moon--minor" style="--orbit: 1.66; --period: 45s; --phase: -41s; --flat: 0.27; --moon: 0.016; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.91; --period: 25s; --phase: -17s; --flat: 0.2; --moon: 0.013"></span>
+            <span class="moon moon--minor" style="--orbit: 0.76; --period: 26s; --phase: -22s; --flat: 0.12; --moon: 0.017"></span>
+            <span class="moon moon--minor" style="--orbit: 1.5; --period: 38s; --phase: -13s; --flat: 0.33; --moon: 0.016"></span>
+            <span class="moon moon--minor" style="--orbit: 0.88; --period: 39s; --phase: -20s; --flat: 0.16; --moon: 0.017; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.28; --period: 38s; --phase: -38s; --flat: 0.26; --moon: 0.016; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.57; --period: 38s; --phase: -19s; --flat: 0.26; --moon: 0.015"></span>
+            <span class="moon moon--minor" style="--orbit: 1.06; --period: 38s; --phase: -22s; --flat: 0.19; --moon: 0.016; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.47; --period: 38s; --phase: -7s; --flat: 0.38; --moon: 0.012"></span>
+            <span class="moon moon--minor" style="--orbit: 1.5; --period: 47s; --phase: -9s; --flat: 0.32; --moon: 0.012; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.95; --period: 32s; --phase: -29s; --flat: 0.34; --moon: 0.022"></span>
+            <span class="moon moon--minor" style="--orbit: 0.8; --period: 27s; --phase: -1s; --flat: 0.31; --moon: 0.02; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.69; --period: 32s; --phase: -15s; --flat: 0.42; --moon: 0.016"></span>
+            <span class="moon moon--minor" style="--orbit: 0.76; --period: 26s; --phase: -7s; --flat: 0.29; --moon: 0.014"></span>
+            <span class="moon moon--minor" style="--orbit: 1.08; --period: 37s; --phase: -16s; --flat: 0.34; --moon: 0.013"></span>
+            <span class="moon moon--minor" style="--orbit: 1.23; --period: 40s; --phase: -38s; --flat: 0.27; --moon: 0.014; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 0.92; --period: 32s; --phase: -22s; --flat: 0.2; --moon: 0.011"></span>
+            <span class="moon moon--minor" style="--orbit: 1.47; --period: 39s; --phase: -2s; --flat: 0.37; --moon: 0.019; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.37; --period: 33s; --phase: -11s; --flat: 0.34; --moon: 0.015"></span>
+            <span class="moon moon--minor" style="--orbit: 1.09; --period: 40s; --phase: -40s; --flat: 0.29; --moon: 0.014; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.64; --period: 44s; --phase: -41s; --flat: 0.32; --moon: 0.021"></span>
+            <span class="moon moon--minor" style="--orbit: 1.31; --period: 39s; --phase: -2s; --flat: 0.32; --moon: 0.017; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.17; --period: 32s; --phase: -30s; --flat: 0.36; --moon: 0.018; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.67; --period: 48s; --phase: -26s; --flat: 0.16; --moon: 0.012; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.76; --period: 32s; --phase: -4s; --flat: 0.31; --moon: 0.017; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.67; --period: 31s; --phase: -4s; --flat: 0.3; --moon: 0.02; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.27; --period: 35s; --phase: -22s; --flat: 0.12; --moon: 0.017"></span>
+            <span class="moon moon--minor" style="--orbit: 1.36; --period: 35s; --phase: -34s; --flat: 0.37; --moon: 0.016; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.67; --period: 28s; --phase: -1s; --flat: 0.38; --moon: 0.015; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.13; --period: 30s; --phase: -10s; --flat: 0.24; --moon: 0.016; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.71; --period: 28s; --phase: -27s; --flat: 0.25; --moon: 0.021; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 0.94; --period: 35s; --phase: -33s; --flat: 0.25; --moon: 0.021; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.62; --period: 47s; --phase: -30s; --flat: 0.4; --moon: 0.019; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.74; --period: 33s; --phase: -1s; --flat: 0.21; --moon: 0.013; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.54; --period: 51s; --phase: -9s; --flat: 0.35; --moon: 0.022"></span>
+            <span class="moon moon--minor" style="--orbit: 1.0; --period: 29s; --phase: -24s; --flat: 0.19; --moon: 0.016; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.53; --period: 40s; --phase: -2s; --flat: 0.12; --moon: 0.021"></span>
+            <span class="moon moon--minor" style="--orbit: 1.7; --period: 45s; --phase: -2s; --flat: 0.15; --moon: 0.016"></span>
+            <span class="moon moon--minor" style="--orbit: 1.7; --period: 48s; --phase: -30s; --flat: 0.13; --moon: 0.014; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.75; --period: 22s; --phase: -10s; --flat: 0.14; --moon: 0.02; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.55; --period: 48s; --phase: -20s; --flat: 0.18; --moon: 0.02; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.59; --period: 38s; --phase: 0s; --flat: 0.41; --moon: 0.013"></span>
+            <span class="moon moon--minor" style="--orbit: 1.05; --period: 27s; --phase: -22s; --flat: 0.31; --moon: 0.018; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.0; --period: 33s; --phase: -32s; --flat: 0.39; --moon: 0.022"></span>
+            <span class="moon moon--minor" style="--orbit: 1.66; --period: 48s; --phase: -39s; --flat: 0.1; --moon: 0.02"></span>
+            <span class="moon moon--minor" style="--orbit: 0.97; --period: 35s; --phase: -33s; --flat: 0.24; --moon: 0.019; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.21; --period: 40s; --phase: -34s; --flat: 0.16; --moon: 0.021"></span>
+            <span class="moon moon--minor" style="--orbit: 0.81; --period: 32s; --phase: -18s; --flat: 0.4; --moon: 0.016; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.07; --period: 29s; --phase: -5s; --flat: 0.38; --moon: 0.018; --tint: #c9c2b8"></span>
+          </div>
+          <div class="slot__info">
+            <p class="slot__eyebrow">Gas giant · 9.54 AU</p>
+            <h2 class="slot__name" id="title-saturn">Saturn</h2>
+            <p class="slot__tagline">The jewel of the solar system, crowned by shimmering rings of ice.</p>
+            <label class="cta" for="read-saturn">Explore Saturn <span aria-hidden="true">→</span></label>
+          </div>
+        </section>
+
+        <!-- Uranus -->
+        <section class="slot theme-uranus" style="--i: 6" aria-labelledby="title-uranus">
+          <div class="planet" style="--scale: .7; --spin: 110s; --ring-scale: 1.7; --ring-tilt: -78deg" aria-hidden="true">
+            <div class="planet__ring planet__ring--back"></div>
+            <div class="planet__body"></div>
+            <div class="planet__ring planet__ring--front"></div>
+            <!-- 5 named moons + 24 minor moons = 29 -->
+            <span class="moon" style="--orbit: 0.64; --moon: 0.045; --period: 8s; --phase: 0s; --tint: #cfcfcf">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Miranda</span></span>
+            </span>
+            <span class="moon" style="--orbit: 0.72; --moon: 0.05; --period: 12s; --phase: -3s; --tint: #c9c9c9">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Ariel</span></span>
+            </span>
+            <span class="moon" style="--orbit: 0.8; --moon: 0.05; --period: 16s; --phase: -6s; --tint: #8f8f8f">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Umbriel</span></span>
+            </span>
+            <span class="moon" style="--orbit: 0.9; --moon: 0.06; --period: 21s; --phase: -5s; --tint: #b9b2a8">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Titania</span></span>
+            </span>
+            <span class="moon" style="--orbit: 1.0; --moon: 0.06; --period: 27s; --phase: -12s; --tint: #a39b92">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Oberon</span></span>
+            </span>
+            <span class="moon moon--minor" style="--orbit: 1.12; --period: 31s; --phase: -21s; --flat: 0.32; --moon: 0.014; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.06; --period: 29s; --phase: -15s; --flat: 0.28; --moon: 0.012; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.24; --period: 32s; --phase: -16s; --flat: 0.25; --moon: 0.022"></span>
+            <span class="moon moon--minor" style="--orbit: 1.1; --period: 43s; --phase: -22s; --flat: 0.24; --moon: 0.02; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.05; --period: 39s; --phase: -5s; --flat: 0.34; --moon: 0.012; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.63; --period: 31s; --phase: -30s; --flat: 0.24; --moon: 0.013; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.1; --period: 42s; --phase: -24s; --flat: 0.39; --moon: 0.022; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.24; --period: 42s; --phase: 0s; --flat: 0.17; --moon: 0.014; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 1.36; --period: 44s; --phase: -2s; --flat: 0.29; --moon: 0.012; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 0.69; --period: 35s; --phase: -24s; --flat: 0.17; --moon: 0.014; --tint: #aaa49c"></span>
+            <span class="moon moon--minor" style="--orbit: 0.95; --period: 38s; --phase: -19s; --flat: 0.11; --moon: 0.014; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.3; --period: 42s; --phase: -35s; --flat: 0.28; --moon: 0.014"></span>
+            <span class="moon moon--minor" style="--orbit: 1.21; --period: 34s; --phase: -15s; --flat: 0.09; --moon: 0.024; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 1.3; --period: 44s; --phase: -2s; --flat: 0.14; --moon: 0.022"></span>
+            <span class="moon moon--minor" style="--orbit: 0.91; --period: 32s; --phase: -5s; --flat: 0.37; --moon: 0.016"></span>
+            <span class="moon moon--minor" style="--orbit: 1.09; --period: 29s; --phase: -10s; --flat: 0.15; --moon: 0.023; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.77; --period: 35s; --phase: -25s; --flat: 0.19; --moon: 0.017"></span>
+            <span class="moon moon--minor" style="--orbit: 0.85; --period: 29s; --phase: -14s; --flat: 0.16; --moon: 0.014"></span>
+            <span class="moon moon--minor" style="--orbit: 1.09; --period: 38s; --phase: -28s; --flat: 0.13; --moon: 0.016; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.89; --period: 33s; --phase: -19s; --flat: 0.13; --moon: 0.02"></span>
+            <span class="moon moon--minor" style="--orbit: 1.32; --period: 33s; --phase: -7s; --flat: 0.22; --moon: 0.018; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.23; --period: 34s; --phase: -27s; --flat: 0.13; --moon: 0.012"></span>
+            <span class="moon moon--minor" style="--orbit: 0.87; --period: 29s; --phase: -25s; --flat: 0.16; --moon: 0.022"></span>
+            <span class="moon moon--minor" style="--orbit: 0.87; --period: 35s; --phase: -24s; --flat: 0.38; --moon: 0.021; --tint: #9a928a"></span>
+          </div>
+          <div class="slot__info">
+            <p class="slot__eyebrow">Ice giant · 19.19 AU</p>
+            <h2 class="slot__name" id="title-uranus">Uranus</h2>
+            <p class="slot__tagline">An ice giant knocked onto its side, rolling around the Sun.</p>
+            <label class="cta" for="read-uranus">Explore Uranus <span aria-hidden="true">→</span></label>
+          </div>
+        </section>
+
+        <!-- Neptune -->
+        <section class="slot theme-neptune" style="--i: 7" aria-labelledby="title-neptune">
+          <div class="planet" style="--scale: .68; --spin: 100s" aria-hidden="true">
+            <div class="planet__body"></div>
+            <!-- 3 named moons + 13 minor moons = 16 -->
+            <span class="moon" style="--orbit: 0.62; --moon: 0.04; --period: 9s; --phase: -4s; --tint: #8c8c8c">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Proteus</span></span>
+            </span>
+            <span class="moon" style="--orbit: 0.8; --moon: 0.07; --period: 15s; --phase: 0s; --tint: #d9c9c9">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Triton</span></span>
+            </span>
+            <span class="moon" style="--orbit: 1.15; --moon: 0.035; --period: 38s; --phase: -15s; --tint: #b8b8b8">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Nereid</span></span>
+            </span>
+            <span class="moon moon--minor" style="--orbit: 1.24; --period: 46s; --phase: -7s; --flat: 0.15; --moon: 0.023"></span>
+            <span class="moon moon--minor" style="--orbit: 0.9; --period: 31s; --phase: -24s; --flat: 0.4; --moon: 0.019; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.77; --period: 31s; --phase: -20s; --flat: 0.41; --moon: 0.012; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.05; --period: 32s; --phase: -11s; --flat: 0.24; --moon: 0.024"></span>
+            <span class="moon moon--minor" style="--orbit: 1.17; --period: 44s; --phase: -37s; --flat: 0.19; --moon: 0.013"></span>
+            <span class="moon moon--minor" style="--orbit: 1.02; --period: 38s; --phase: -24s; --flat: 0.16; --moon: 0.011; --tint: #85807a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.73; --period: 31s; --phase: -27s; --flat: 0.3; --moon: 0.014"></span>
+            <span class="moon moon--minor" style="--orbit: 1.37; --period: 42s; --phase: -3s; --flat: 0.36; --moon: 0.022; --tint: #9a928a"></span>
+            <span class="moon moon--minor" style="--orbit: 0.56; --period: 22s; --phase: -14s; --flat: 0.09; --moon: 0.015; --tint: #c9c2b8"></span>
+            <span class="moon moon--minor" style="--orbit: 0.83; --period: 35s; --phase: -23s; --flat: 0.22; --moon: 0.02; --tint: #b9b2a8"></span>
+            <span class="moon moon--minor" style="--orbit: 1.29; --period: 44s; --phase: -4s; --flat: 0.29; --moon: 0.021"></span>
+            <span class="moon moon--minor" style="--orbit: 0.9; --period: 39s; --phase: -34s; --flat: 0.09; --moon: 0.015"></span>
+            <span class="moon moon--minor" style="--orbit: 0.82; --period: 29s; --phase: -21s; --flat: 0.36; --moon: 0.013; --tint: #9a928a"></span>
+          </div>
+          <div class="slot__info">
+            <p class="slot__eyebrow">Ice giant · 30.07 AU</p>
+            <h2 class="slot__name" id="title-neptune">Neptune</h2>
+            <p class="slot__tagline">A deep-blue world of supersonic winds at the edge of the planets.</p>
+            <label class="cta" for="read-neptune">Explore Neptune <span aria-hidden="true">→</span></label>
+          </div>
+        </section>
+
+        <!-- Pluto -->
+        <section class="slot theme-pluto" style="--i: 8" aria-labelledby="title-pluto">
+          <div class="planet" style="--scale: .38; --spin: 180s" aria-hidden="true">
+            <div class="planet__body"></div>
+            <!-- 5 named moons = 5 -->
+            <span class="moon" style="--orbit: 0.62; --moon: 0.45; --period: 10s; --phase: 0s; --tint: #9c8f86">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Charon</span></span>
+            </span>
+            <span class="moon" style="--orbit: 0.95; --moon: 0.05; --period: 11s; --phase: -3s; --tint: #aaa">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Kerberos</span></span>
+            </span>
+            <span class="moon" style="--orbit: 1.1; --moon: 0.08; --period: 14s; --phase: -7s; --tint: #bbb">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Nix</span></span>
+            </span>
+            <span class="moon" style="--orbit: 1.25; --moon: 0.05; --period: 16s; --phase: -12s; --tint: #b3aaa2">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Styx</span></span>
+            </span>
+            <span class="moon" style="--orbit: 1.4; --moon: 0.08; --period: 19s; --phase: -15s; --tint: #c4bcb4">
+              <span class="moon__y"><span class="moon__body"></span><span class="moon__label">Hydra</span></span>
+            </span>
+          </div>
+          <div class="slot__info">
+            <p class="slot__eyebrow">Dwarf planet · 39.5 AU</p>
+            <h2 class="slot__name" id="title-pluto">Pluto</h2>
+            <p class="slot__tagline">A frozen dwarf planet with a heart of nitrogen ice.</p>
+            <label class="cta" for="read-pluto">Explore Pluto <span aria-hidden="true">→</span></label>
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+    <p class="hint" aria-hidden="true">Focus the planet list and use the ↑ ↓ keys</p>
+
+    <!-- Drawer backdrop + closed state -->
+    <input type="radio" name="panel" id="panel-none" checked hidden>
+    <label class="backdrop" for="panel-none" aria-hidden="true"></label>
+
+    <!-- Details drawers -->
+    <article class="panel theme-mercury" aria-label="Mercury details">
+      <input class="panel__toggle" type="radio" name="panel" id="read-mercury" hidden>
+      <label class="panel__close" for="panel-none">Close <span aria-hidden="true">✕</span></label>
+      <header class="panel__head">
+        <div class="panel__orb" aria-hidden="true"></div>
+        <p class="eyebrow">Terrestrial planet</p>
+        <h2 class="panel__title">Mercury</h2>
+        <p class="panel__lede">The smallest planet and the closest to the Sun, Mercury races around our star in just 88 days — a speed that earned it the name of the Roman messenger of the gods.</p>
+      </header>
+      <dl class="stats">
+        <div><dt>Distance</dt><dd>0.39 AU</dd></div>
+        <div><dt>Diameter</dt><dd>4,879 km</dd></div>
+        <div><dt>Year</dt><dd>88 Earth days</dd></div>
+        <div><dt>Day</dt><dd>176 Earth days</dd></div>
+        <div><dt>Moons</dt><dd>0</dd></div>
+        <div><dt>Avg. temp</dt><dd>167 °C</dd></div>
+      </dl>
+      <ol class="facts">
+        <li><h3>Wrinkled and shrinking</h3><p>As its iron core cooled, Mercury contracted and its crust crumpled into cliffs called lobate scarps, some over a kilometre high.</p></li>
+        <li><h3>Two years, one day</h3><p>One solar day — sunrise to sunrise — lasts 176 Earth days, twice as long as the planet's 88-day year.</p></li>
+        <li><h3>Extreme swings</h3><p>With almost no atmosphere to hold heat, the surface falls to about −180 °C at night and climbs to roughly 430 °C by day.</p></li>
+      </ol>
+    </article>
+
+    <article class="panel theme-venus" aria-label="Venus details">
+      <input class="panel__toggle" type="radio" name="panel" id="read-venus" hidden>
+      <label class="panel__close" for="panel-none">Close <span aria-hidden="true">✕</span></label>
+      <header class="panel__head">
+        <div class="panel__orb" aria-hidden="true"></div>
+        <p class="eyebrow">Terrestrial planet</p>
+        <h2 class="panel__title">Venus</h2>
+        <p class="panel__lede">Named for the Roman goddess of love and beauty, Venus is the brightest planet in our sky — and one of the most hostile places in the solar system.</p>
+      </header>
+      <dl class="stats">
+        <div><dt>Distance</dt><dd>0.72 AU</dd></div>
+        <div><dt>Diameter</dt><dd>12,104 km</dd></div>
+        <div><dt>Year</dt><dd>225 Earth days</dd></div>
+        <div><dt>Day</dt><dd>117 Earth days</dd></div>
+        <div><dt>Moons</dt><dd>0</dd></div>
+        <div><dt>Avg. temp</dt><dd>464 °C</dd></div>
+      </dl>
+      <ol class="facts">
+        <li><h3>Hotter than Mercury</h3><p>A thick carbon-dioxide atmosphere traps heat so well that the surface is hot enough to melt lead.</p></li>
+        <li><h3>Backwards and slow</h3><p>Venus spins in the opposite direction to most planets, taking 243 Earth days to turn once — longer than its year.</p></li>
+        <li><h3>Crushing pressure</h3><p>Air pressure at the surface is about 92 times Earth's, similar to being roughly 900 metres under the ocean.</p></li>
+      </ol>
+    </article>
+
+    <article class="panel theme-earth" aria-label="Earth details">
+      <input class="panel__toggle" type="radio" name="panel" id="read-earth" hidden>
+      <label class="panel__close" for="panel-none">Close <span aria-hidden="true">✕</span></label>
+      <header class="panel__head">
+        <div class="panel__orb" aria-hidden="true"></div>
+        <p class="eyebrow">Terrestrial planet</p>
+        <h2 class="panel__title">Earth</h2>
+        <p class="panel__lede">The third planet from the Sun is the only place we know of with liquid water on its surface, a protective magnetic field, and life.</p>
+      </header>
+      <dl class="stats">
+        <div><dt>Distance</dt><dd>1.00 AU</dd></div>
+        <div><dt>Diameter</dt><dd>12,742 km</dd></div>
+        <div><dt>Year</dt><dd>365.25 days</dd></div>
+        <div><dt>Day</dt><dd>24 hours</dd></div>
+        <div><dt>Moons</dt><dd>1</dd></div>
+        <div><dt>Avg. temp</dt><dd>15 °C</dd></div>
+      </dl>
+      <ol class="facts">
+        <li><h3>An ocean world</h3><p>About 71% of the surface is covered in water, which is why Earth looks blue from space.</p></li>
+        <li><h3>A magnetic shield</h3><p>Swirling molten iron and nickel in the core generate a magnetic field that deflects most of the solar wind.</p></li>
+        <li><h3>Steadied by the Moon</h3><p>The Moon's gravity helps stabilise Earth's tilt, giving us regular seasons. It is also drifting away by about 3.8 cm every year.</p></li>
+      </ol>
+    </article>
+
+    <article class="panel theme-mars" aria-label="Mars details">
+      <input class="panel__toggle" type="radio" name="panel" id="read-mars" hidden>
+      <label class="panel__close" for="panel-none">Close <span aria-hidden="true">✕</span></label>
+      <header class="panel__head">
+        <div class="panel__orb" aria-hidden="true"></div>
+        <p class="eyebrow">Terrestrial planet</p>
+        <h2 class="panel__title">Mars</h2>
+        <p class="panel__lede">A cold desert world with a thin carbon-dioxide atmosphere, Mars shows signs of ancient rivers and lakes and is the most explored planet beyond Earth.</p>
+      </header>
+      <dl class="stats">
+        <div><dt>Distance</dt><dd>1.52 AU</dd></div>
+        <div><dt>Diameter</dt><dd>6,779 km</dd></div>
+        <div><dt>Year</dt><dd>687 Earth days</dd></div>
+        <div><dt>Day</dt><dd>24 h 37 min</dd></div>
+        <div><dt>Moons</dt><dd>2</dd></div>
+        <div><dt>Avg. temp</dt><dd>−65 °C</dd></div>
+      </dl>
+      <ol class="facts">
+        <li><h3>A giant volcano</h3><p>Olympus Mons rises about 22 km and spans roughly 600 km — around two and a half times the height of Everest above sea level.</p></li>
+        <li><h3>A scarred canyon</h3><p>Valles Marineris stretches about 4,000 km across the planet, long enough to span the continental United States.</p></li>
+        <li><h3>Planet-wide storms</h3><p>Dust storms can grow to engulf the entire planet and last for weeks or even months.</p></li>
+      </ol>
+    </article>
+
+    <article class="panel theme-jupiter" aria-label="Jupiter details">
+      <input class="panel__toggle" type="radio" name="panel" id="read-jupiter" hidden>
+      <label class="panel__close" for="panel-none">Close <span aria-hidden="true">✕</span></label>
+      <header class="panel__head">
+        <div class="panel__orb" aria-hidden="true"></div>
+        <p class="eyebrow">Gas giant</p>
+        <h2 class="panel__title">Jupiter</h2>
+        <p class="panel__lede">The largest planet is a swirling ball of hydrogen and helium with more than twice the mass of all the other planets put together.</p>
+      </header>
+      <dl class="stats">
+        <div><dt>Distance</dt><dd>5.20 AU</dd></div>
+        <div><dt>Diameter</dt><dd>139,820 km</dd></div>
+        <div><dt>Year</dt><dd>11.9 Earth years</dd></div>
+        <div><dt>Day</dt><dd>9 h 56 min</dd></div>
+        <div><dt>Moons</dt><dd>115</dd></div>
+        <div><dt>Cloud tops</dt><dd>−110 °C</dd></div>
+      </dl>
+      <ol class="facts">
+        <li><h3>The Great Red Spot</h3><p>This storm is wider than Earth and has been observed for more than 150 years, although it has been slowly shrinking.</p></li>
+        <li><h3>The shortest day</h3><p>Jupiter spins once every 9 hours 56 minutes, so fast that the planet bulges at the equator.</p></li>
+        <li><h3>Galileo's moons</h3><p>In 1610 Galileo spotted Io, Europa, Ganymede and Callisto — the first moons seen orbiting another world. Europa hides a salty ocean beneath its ice.</p></li>
+      </ol>
+    </article>
+
+    <article class="panel theme-saturn" aria-label="Saturn details">
+      <input class="panel__toggle" type="radio" name="panel" id="read-saturn" hidden>
+      <label class="panel__close" for="panel-none">Close <span aria-hidden="true">✕</span></label>
+      <header class="panel__head">
+        <div class="panel__orb" aria-hidden="true"></div>
+        <p class="eyebrow">Gas giant</p>
+        <h2 class="panel__title">Saturn</h2>
+        <p class="panel__lede">The second-largest planet is famous for its rings — countless pieces of ice and rock, from dust grains to house-sized boulders.</p>
+      </header>
+      <dl class="stats">
+        <div><dt>Distance</dt><dd>9.54 AU</dd></div>
+        <div><dt>Diameter</dt><dd>116,460 km</dd></div>
+        <div><dt>Year</dt><dd>29.4 Earth years</dd></div>
+        <div><dt>Day</dt><dd>10 h 33 min</dd></div>
+        <div><dt>Moons</dt><dd>293</dd></div>
+        <div><dt>Cloud tops</dt><dd>−140 °C</dd></div>
+      </dl>
+      <ol class="facts">
+        <li><h3>Light enough to float</h3><p>Saturn's average density is lower than water's, so in a big enough bathtub it would float.</p></li>
+        <li><h3>Wide but wafer-thin</h3><p>The rings span about 280,000 km yet are typically only around 10 metres thick.</p></li>
+        <li><h3>Moons with secrets</h3><p>Titan has a thick orange atmosphere and methane lakes, while Enceladus shoots geysers of water ice from a hidden ocean.</p></li>
+      </ol>
+    </article>
+
+    <article class="panel theme-uranus" aria-label="Uranus details">
+      <input class="panel__toggle" type="radio" name="panel" id="read-uranus" hidden>
+      <label class="panel__close" for="panel-none">Close <span aria-hidden="true">✕</span></label>
+      <header class="panel__head">
+        <div class="panel__orb" aria-hidden="true"></div>
+        <p class="eyebrow">Ice giant</p>
+        <h2 class="panel__title">Uranus</h2>
+        <p class="panel__lede">The first planet found with a telescope — by William Herschel in 1781 — Uranus is a pale cyan world rich in water, ammonia and methane ices.</p>
+      </header>
+      <dl class="stats">
+        <div><dt>Distance</dt><dd>19.19 AU</dd></div>
+        <div><dt>Diameter</dt><dd>50,724 km</dd></div>
+        <div><dt>Year</dt><dd>84 Earth years</dd></div>
+        <div><dt>Day</dt><dd>17 h 14 min</dd></div>
+        <div><dt>Moons</dt><dd>29</dd></div>
+        <div><dt>Cloud tops</dt><dd>−195 °C</dd></div>
+      </dl>
+      <ol class="facts">
+        <li><h3>Rolling on its side</h3><p>Uranus is tilted by about 98°, so each pole gets roughly 42 years of sunlight followed by 42 years of darkness.</p></li>
+        <li><h3>The coldest atmosphere</h3><p>Temperatures drop to around −224 °C, colder than Neptune even though it is much closer to the Sun.</p></li>
+        <li><h3>Rings and literary moons</h3><p>It has 13 known rings and moons named after characters from Shakespeare and Alexander Pope.</p></li>
+      </ol>
+    </article>
+
+    <article class="panel theme-neptune" aria-label="Neptune details">
+      <input class="panel__toggle" type="radio" name="panel" id="read-neptune" hidden>
+      <label class="panel__close" for="panel-none">Close <span aria-hidden="true">✕</span></label>
+      <header class="panel__head">
+        <div class="panel__orb" aria-hidden="true"></div>
+        <p class="eyebrow">Ice giant</p>
+        <h2 class="panel__title">Neptune</h2>
+        <p class="panel__lede">The most distant planet is a dark, cold and windy ice giant. Its existence was predicted with mathematics before anyone saw it.</p>
+      </header>
+      <dl class="stats">
+        <div><dt>Distance</dt><dd>30.07 AU</dd></div>
+        <div><dt>Diameter</dt><dd>49,244 km</dd></div>
+        <div><dt>Year</dt><dd>165 Earth years</dd></div>
+        <div><dt>Day</dt><dd>16 h 6 min</dd></div>
+        <div><dt>Moons</dt><dd>16</dd></div>
+        <div><dt>Cloud tops</dt><dd>−200 °C</dd></div>
+      </dl>
+      <ol class="facts">
+        <li><h3>Found by mathematics</h3><p>Wobbles in Uranus's orbit led Urbain Le Verrier to predict a new planet; Johann Galle found it in 1846 within a degree of the predicted spot.</p></li>
+        <li><h3>The fastest winds</h3><p>Winds reach about 2,000 km/h, the fastest measured on any planet in the solar system.</p></li>
+        <li><h3>A captured moon</h3><p>Triton orbits backwards, which suggests it was captured from the Kuiper Belt. Voyager 2 spotted geysers erupting from its icy surface.</p></li>
+      </ol>
+    </article>
+
+    <article class="panel theme-pluto" aria-label="Pluto details">
+      <input class="panel__toggle" type="radio" name="panel" id="read-pluto" hidden>
+      <label class="panel__close" for="panel-none">Close <span aria-hidden="true">✕</span></label>
+      <header class="panel__head">
+        <div class="panel__orb" aria-hidden="true"></div>
+        <p class="eyebrow">Dwarf planet</p>
+        <h2 class="panel__title">Pluto</h2>
+        <p class="panel__lede">Once counted as the ninth planet, Pluto was reclassified as a dwarf planet in 2006. It is a frozen world of the Kuiper Belt, and still full of surprises.</p>
+      </header>
+      <dl class="stats">
+        <div><dt>Distance</dt><dd>39.5 AU (avg.)</dd></div>
+        <div><dt>Diameter</dt><dd>2,377 km</dd></div>
+        <div><dt>Year</dt><dd>248 Earth years</dd></div>
+        <div><dt>Day</dt><dd>6.4 Earth days</dd></div>
+        <div><dt>Moons</dt><dd>5</dd></div>
+        <div><dt>Avg. temp</dt><dd>−230 °C</dd></div>
+      </dl>
+      <ol class="facts">
+        <li><h3>A heart of ice</h3><p>NASA's New Horizons flyby in 2015 revealed Tombaugh Regio, a vast heart-shaped plain of nitrogen ice.</p></li>
+        <li><h3>A double world</h3><p>Charon is half of Pluto's diameter, and the two orbit a point in the space between them, always showing each other the same face.</p></li>
+        <li><h3>Very slow seasons</h3><p>Discovered in 1930 by Clyde Tombaugh, Pluto has not yet completed a single orbit since — each one takes 248 years.</p></li>
+      </ol>
+    </article>
+  </div>
+</body>
+</html>
