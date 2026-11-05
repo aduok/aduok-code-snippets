@@ -1,0 +1,611 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Basketball Style File Upload</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: the whole page is the court. Header floats top, hoop sits top-centre, the file waits lower-left with a large pull range, upload cards dock at the bottom. */
+:root {
+  --panel: #edf0f5;
+  --card: #ffffff;
+  --ink: #131a23;
+  --muted: #68717f;
+  --line: #c3c9d3;
+  --chip: #e1e5ec;
+  --orange: #e2723a;
+  --orange-deep: #c4552a;
+  --tint: #fdf0e6;
+  --net: #a9afb9;
+  --ok: #389a66;
+  --paper: #ffffff;
+  --fold: #e4e7ec;
+  --fileline: #d3d7de;
+  --pdf: #d94a5f;
+  --shadow: rgba(24, 34, 54, .28);
+  --font: 'Figtree', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --panel: #151a21; --card: #1d242d; --ink: #edf0f4; --muted: #8c96a4;
+    --line: #3a424e; --chip: #232b35; --orange: #ef8450; --orange-deep: #d46a38; --tint: #2c2019;
+    --net: #5b6572; --ok: #52bb85; --paper: #f1f3f6; --fold: #d5d9df; --fileline: #c5cad3;
+    --pdf: #e2566b; --shadow: rgba(0, 0, 0, .55);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --panel: #151a21; --card: #1d242d; --ink: #edf0f4; --muted: #8c96a4;
+  --line: #3a424e; --chip: #232b35; --orange: #ef8450; --orange-deep: #d46a38; --tint: #2c2019;
+  --net: #5b6572; --ok: #52bb85; --paper: #f1f3f6; --fold: #d5d9df; --fileline: #c5cad3;
+  --pdf: #e2566b; --shadow: rgba(0, 0, 0, .55);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: var(--panel);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.4;
+  position: relative;
+  min-height: 560px;
+  overflow: hidden;
+}
+
+.stage { position: absolute; inset: 0; overflow: hidden; user-select: none; -webkit-user-select: none; }
+.world { position: absolute; left: 0; top: 0; transform-origin: 0 0; z-index: 5; }
+
+/* header */
+.head {
+  position: absolute; left: 0; right: 0; top: 0; z-index: 20; pointer-events: none;
+  padding-block: 16px 8px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+}
+.headl { min-width: 0; }
+h1 { margin: 0; font-size: 28px; line-height: 1.15; font-weight: 600; letter-spacing: -0.015em; text-wrap: balance; }
+.sub { margin: 4px 0 0; color: var(--muted); font-size: 15px; }
+.actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; pointer-events: auto; }
+.badge {
+  background: var(--chip); color: var(--muted); border-radius: 999px;
+  padding: 6px 14px; font-size: 13px; font-weight: 500; white-space: nowrap;
+  display: inline-flex; gap: 6px; align-items: baseline;
+}
+.badge b { color: var(--ink); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; display: inline-block; }
+.badge.bump b { animation: bump .4s ease-out; }
+@keyframes bump { 0% { transform: scale(1); } 40% { transform: scale(1.35); color: var(--orange); } 100% { transform: scale(1); } }
+.btn {
+  font: inherit; font-weight: 500; font-size: 13px; padding: 8px 13px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.btn:hover { border-color: var(--orange); color: var(--orange-deep); }
+.btn:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+.btn.ghost { background: transparent; }
+.btn.primary { background: var(--orange-deep); border-color: var(--orange-deep); color: #fff; font-weight: 600; }
+.btn.primary:hover { color: #fff; filter: brightness(1.1); }
+
+/* hoop group, drawn in a 400 x 260 design space and moved into place by script */
+.hoopg { position: absolute; width: 400px; height: 260px; }
+.zone {
+  position: absolute; left: 84px; top: 10px; width: 232px; height: 150px; z-index: 1;
+  background: var(--card); border: 1.5px dashed var(--line); border-radius: 18px;
+  display: flex; flex-direction: column; align-items: center; padding-top: 14px;
+  transition: background .18s, border-color .18s;
+}
+.zone svg { width: 22px; height: 22px; color: var(--muted); }
+.zt { margin-top: 6px; font-size: 18px; font-weight: 500; }
+.zs { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.zone.hot { background: var(--tint); border-color: var(--orange); }
+
+.hoop { position: absolute; left: 0; top: 0; width: 400px; height: 260px; z-index: 3; pointer-events: none; overflow: visible; }
+.hoop .board { fill: none; stroke: var(--orange); stroke-width: 2.6; }
+.hoop .rim { fill: none; stroke: var(--orange); stroke-width: 5; }
+.hoop .bracket { fill: var(--orange-deep); }
+.hoop .meshline { fill: none; stroke: var(--net); stroke-width: 1.4; stroke-linecap: round; }
+.net { transform-origin: 200px 166px; }
+.net.swish { animation: swish .55s ease-out; }
+@keyframes swish {
+  0% { transform: scale(1, 1); }
+  30% { transform: scale(.9, 1.14); }
+  60% { transform: scale(1.04, .96); }
+  100% { transform: scale(1, 1); }
+}
+.pop {
+  position: absolute; left: 256px; top: 92px; z-index: 6; font-size: 28px; font-weight: 700; color: var(--orange);
+  opacity: 0; pointer-events: none; font-variant-numeric: tabular-nums;
+}
+.pop.go { animation: pop .95s ease-out; }
+@keyframes pop {
+  0% { opacity: 0; transform: translateY(10px) scale(.6); }
+  25% { opacity: 1; transform: translateY(-4px) scale(1.1); }
+  70% { opacity: 1; transform: translateY(-10px) scale(1); }
+  100% { opacity: 0; transform: translateY(-18px) scale(1); }
+}
+
+/* aiming */
+.dot { position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; border-radius: 50%; background: var(--orange); z-index: 4; pointer-events: none; }
+.aim { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 4; pointer-events: none; overflow: visible; }
+.aim line.arrow { stroke: var(--orange); stroke-width: 5; stroke-linecap: round; }
+.aim path { fill: var(--orange); }
+.aim line.band { stroke: var(--muted); stroke-width: 2; stroke-dasharray: 2 7; stroke-linecap: round; opacity: .75; }
+.aim.on line.arrow { stroke: var(--ok); }
+.aim.on path { fill: var(--ok); }
+
+.file {
+  position: absolute; left: -28px; top: -34px; width: 56px; height: 68px; z-index: 5;
+  cursor: grab; touch-action: none; will-change: transform; transition: opacity .3s;
+  border-radius: 10px;
+}
+.file::after { content: ""; position: absolute; inset: -20px; }
+.file.grab { cursor: grabbing; }
+.file.gone { opacity: 0; }
+.file:focus-visible { outline: 2px solid var(--orange); outline-offset: 6px; }
+.file .inner { width: 100%; height: 100%; }
+.file svg { display: block; width: 56px; height: 68px; filter: drop-shadow(0 6px 8px var(--shadow)); }
+.file.idle .inner { animation: bob 2.6s ease-in-out infinite; }
+.file.idle.enter .inner { animation: enter .35s ease-out, bob 2.6s ease-in-out .35s infinite; }
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes enter { from { transform: scale(.55); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+.cap {
+  position: absolute; transform: translateX(-50%); width: 170px;
+  text-align: center; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: opacity .2s; z-index: 1; pointer-events: none;
+}
+
+/* bottom dock: status line and the latest uploads */
+.dock {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; pointer-events: none;
+  padding-top: 0; padding-bottom: 16px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+}
+.status { margin: 0; text-align: center; color: var(--muted); font-size: 13px; min-height: 20px; }
+.list { list-style: none; margin: 0; padding: 0; width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 10px; }
+.item {
+  background: var(--card); border-radius: 14px; padding: 12px 14px;
+  display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(84px, 32%) auto; gap: 12px; align-items: center;
+  box-shadow: 0 8px 22px -10px var(--shadow);
+  animation: itemin .35s ease-out;
+}
+@keyframes itemin { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.ficon svg { display: block; width: 30px; height: 36px; }
+.meta { min-width: 0; display: flex; flex-direction: column; }
+.meta b { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meta span { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.prog { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.state { font-size: 12px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bar { height: 3px; border-radius: 3px; background: var(--chip); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--ok); transform-origin: left; transform: scaleX(0); }
+.check { width: 26px; height: 26px; border-radius: 50%; background: var(--ok); display: grid; place-items: center; opacity: 0; transform: scale(.5); transition: opacity .25s, transform .25s; }
+.check svg { width: 14px; height: 14px; }
+.item.done .state { color: var(--ok); }
+.item.done .check { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .file.idle .inner, .file.idle.enter .inner, .net.swish, .pop.go, .item, .badge.bump b { animation: none; }
+  .pop.go { opacity: 1; }
+}
+</style>
+
+<div class="stage" id="stage">
+  <div class="world" id="world">
+    <div class="hoopg" id="hoopg">
+      <div class="zone" id="zone">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4"/><path d="M7.5 8.5 12 4l4.5 4.5"/><path d="M5 12.5V18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5.5"/></svg>
+        <div class="zt">Drop files here</div>
+        <div class="zs">or take the shot</div>
+      </div>
+      <svg class="hoop" viewBox="0 0 400 260" aria-hidden="true">
+        <rect class="board" x="150" y="96" width="100" height="56" rx="2"/>
+        <g class="net" id="net"><path class="meshline" id="mesh"/></g>
+        <rect class="bracket" x="191" y="157" width="18" height="9" rx="1.5"/>
+        <ellipse class="rim" cx="200" cy="166" rx="52" ry="6"/>
+      </svg>
+      <div class="pop" id="pop">+1</div>
+    </div>
+
+    <div id="dots"></div>
+    <svg class="aim" id="aim" aria-hidden="true" hidden>
+      <line class="band" id="band" x1="0" y1="0" x2="0" y2="0"/>
+      <line class="arrow" id="aimLine" x1="0" y1="0" x2="0" y2="0"/>
+      <path id="aimHead" d=""/>
+    </svg>
+
+    <div class="file idle" id="file" role="button" tabindex="0" aria-label="Shoot the file into the hoop">
+      <div class="inner" id="fileInner"></div>
+    </div>
+    <div class="cap" id="cap"></div>
+  </div>
+
+  <header class="head" id="head">
+    <div class="headl">
+      <h1>Upload files</h1>
+      <p class="sub">Drag and drop, or take the shot.</p>
+      <div class="actions">
+        <button class="btn" id="browse" type="button">Browse files</button>
+        <button class="btn ghost" id="auto" type="button">Take the shot for me</button>      </div>
+    </div>
+    <div class="badge" id="badge">Uploaded <b id="count">0</b></div>
+  </header>
+
+  <div class="dock">
+    <p class="status" id="status" aria-live="polite">Pull the file back and let go to shoot.</p>
+    <ul class="list" id="list"></ul>
+  </div>
+  <input type="file" id="input" multiple hidden>
+</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var stage = $('stage'), world = $('world'), hoopg = $('hoopg'), head = $('head'), fileEl = $('file'), fileInner = $('fileInner'),
+      zone = $('zone'), net = $('net'), pop = $('pop'), cap = $('cap'), dotsEl = $('dots'), statusEl = $('status'),
+      list = $('list'), countEl = $('count'), badge = $('badge'), input = $('input'),
+      aim = $('aim'), aimLine = $('aimLine'), aimHead = $('aimHead'), band = $('band');
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // world units (the world is the whole page divided by the scale hs)
+  var G = 1000, K = 8, MAXPULL = 150, R = 11, DT = 1 / 60;
+  var hs = 1, WW = 400, HH = 700, ox = 0, oy = 0, FLOOR = 680;
+  var HOME = { x: 90, y: 480 };
+  var RIM_Y = 176, RIM_L = 150, RIM_R = 250, CX = 200, REST_Y = 262;
+  var BB = { x: 150, y: 106, w: 100, h: 56 };
+
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+  // ---- net mesh
+  (function buildNet() {
+    var d = '', top = [], bot = [], i;
+    for (i = 0; i < 7; i++) { top.push(152 + i * 16); bot.push(174 + i * (52 / 6)); }
+    for (i = 0; i < 7; i++) d += 'M' + top[i] + ' 168 L' + bot[i].toFixed(1) + ' 236 ';
+    for (i = 0; i < 6; i++) {
+      d += 'M' + top[i] + ' 168 L' + bot[i + 1].toFixed(1) + ' 236 ';
+      d += 'M' + top[i + 1] + ' 168 L' + bot[i].toFixed(1) + ' 236 ';
+    }
+    $('mesh').setAttribute('d', d);
+  })();
+
+  // ---- file artwork
+  function fileSvg(ext) {
+    return '<svg viewBox="0 0 56 68" aria-hidden="true">' +
+      '<path d="M8 2H36L54 20V60Q54 66 48 66H8Q2 66 2 60V8Q2 2 8 2Z" fill="var(--paper)"/>' +
+      '<path d="M36 2V14Q36 20 42 20H54Z" fill="var(--fold)"/>' +
+      '<rect x="10" y="28" width="30" height="3" rx="1.5" fill="var(--fileline)"/>' +
+      '<rect x="10" y="35" width="24" height="3" rx="1.5" fill="var(--fileline)"/>' +
+      '<rect x="10" y="42" width="28" height="3" rx="1.5" fill="var(--fileline)"/>' +
+      '<rect x="8" y="50" width="28" height="12" rx="3" fill="var(--pdf)"/>' +
+      '<text x="22" y="59" font-size="8" font-weight="700" text-anchor="middle" fill="#fff" font-family="Figtree, system-ui, sans-serif">' + ext + '</text></svg>';
+  }
+  function extOf(name) {
+    var i = name.lastIndexOf('.');
+    if (i < 0) return 'FILE';
+    return name.slice(i + 1).replace(/[^a-z0-9]/gi, '').slice(0, 4).toUpperCase() || 'FILE';
+  }
+  function fmt(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1048576) return Math.round(n / 1024) + ' KB';
+    return (n / 1048576).toFixed(1) + ' MB';
+  }
+
+  // ---- queue of files to shoot
+  var DEMO = { name: 'dummy_file.pdf', size: Math.round(2.4 * 1048576) };
+  var queue = [];
+  function peek() { return queue.length ? queue[0] : DEMO; }
+  function take() { return queue.length ? queue.shift() : { name: DEMO.name, size: DEMO.size }; }
+  function setLabel() {
+    var p = peek();
+    cap.textContent = p.name;
+    fileInner.innerHTML = fileSvg(extOf(p.name));
+    fileEl.setAttribute('aria-label', 'Shoot ' + p.name + ' into the hoop');
+  }
+  function say(m) { statusEl.textContent = m; }
+
+  // ---- uploads
+  var total = 0;
+  function bumpCount() {
+    countEl.textContent = total;
+    badge.classList.remove('bump'); void badge.offsetWidth; badge.classList.add('bump');
+  }
+  function addUpload(f) {
+    total++; bumpCount();
+    var li = document.createElement('li');
+    li.className = 'item';
+    li.innerHTML = '<div class="ficon">' + fileSvg(extOf(f.name)) + '</div>' +
+      '<div class="meta"><b></b><span></span></div>' +
+      '<div class="prog"><span class="state">Uploading… 0%</span><div class="bar"><i></i></div></div>' +
+      '<div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>';
+    li.querySelector('b').textContent = f.name;
+    li.querySelector('.meta span').textContent = fmt(f.size);
+    list.prepend(li);
+    while (list.children.length > 2) list.removeChild(list.lastChild);
+    var bar = li.querySelector('.bar i'), st = li.querySelector('.state');
+    var dur = 1100 + Math.random() * 900, t0 = performance.now();
+    (function tick(now) {
+      var p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 2);
+      bar.style.transform = 'scaleX(' + e + ')';
+      st.textContent = p < 1 ? 'Uploading… ' + Math.round(e * 100) + '%' : 'Uploaded';
+      if (p < 1) requestAnimationFrame(tick); else li.classList.add('done');
+    })(t0);
+  }
+
+  function popPlus() { pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go'); }
+  function swish() { net.classList.remove('swish'); void net.getBoundingClientRect(); net.classList.add('swish'); }
+
+  // ---- state
+  var s = { mode: 'idle', x: HOME.x, y: HOME.y, vx: 0, vy: 0, rot: 0, w: 0, t: 0, scored: false, onFloor: false, fading: false, rt: 0, fx: 0, fy: 0, fr: 0, settle: 0 };
+  function render() { fileEl.style.transform = 'translate(' + s.x + 'px,' + s.y + 'px) rotate(' + s.rot + 'deg)'; }
+
+  // ---- layout: fill the whole page, hoop top-centre, file lower-left
+  function layout() {
+    var W = stage.clientWidth || 400, H = stage.clientHeight || 700;
+    hs = clamp(Math.min(W / 430, H / 680), 0.75, 1.3);
+    WW = W / hs; HH = H / hs;
+    world.style.width = WW + 'px'; world.style.height = HH + 'px';
+    world.style.transform = 'scale(' + hs + ')';
+    var topPx = head.offsetHeight + 8;
+    ox = WW / 2 - 200; oy = topPx / hs - 10;
+    hoopg.style.left = ox + 'px'; hoopg.style.top = oy + 'px';
+    RIM_Y = 166 + oy; RIM_L = 150 + ox; RIM_R = 250 + ox; CX = 200 + ox; REST_Y = 252 + oy;
+    BB.x = 150 + ox; BB.y = 96 + oy;
+    FLOOR = HH - 18;
+    MAXPULL = clamp(HH * 0.26, 120, 210);
+    HOME.x = clamp(WW * 0.24, 76, 300);
+    HOME.y = Math.max(RIM_Y + 170, HH - MAXPULL - 30);
+    // pick K so a good shot needs about three quarters of the full pull
+    var apex = RIM_Y - 90;
+    var vyN = Math.sqrt(2 * G * (HOME.y - apex));
+    var T = vyN / G + Math.sqrt(2 * (RIM_Y - apex) / G);
+    var vxN = (CX - HOME.x) / T;
+    K = Math.hypot(vxN, vyN) * 1.35 / MAXPULL;
+    cap.style.left = HOME.x + 'px'; cap.style.top = (HOME.y + 44) + 'px';
+    if (s.mode === 'idle') { s.x = HOME.x; s.y = HOME.y; render(); }
+  }
+
+  // soft pull toward the hoop centre while falling near it
+  function accel(x, y, vy) {
+    if (vy > 0 && y > RIM_Y - 54 && y < RIM_Y + 6) {
+      var dx = CX - x;
+      if (Math.abs(dx) < 60) return dx * 5;
+    }
+    return 0;
+  }
+
+  function push(nx, ny, pen) {
+    s.x += nx * pen; s.y += ny * pen;
+    var vn = s.vx * nx + s.vy * ny;
+    if (vn < 0) { s.vx -= 1.55 * vn * nx; s.vy -= 1.55 * vn * ny; s.w *= -0.6; }
+  }
+  function hit(px, py, r) {
+    var dx = s.x - px, dy = s.y - py, d = Math.hypot(dx, dy), m = R + r;
+    if (d < m && d > 0.001) push(dx / d, dy / d, m - d);
+  }
+  function collide() {
+    hit(RIM_L, RIM_Y, 4); hit(RIM_R, RIM_Y, 4);
+    // the backboard is seen face-on and sits behind the file, so only the two rim posts deflect it
+  }
+
+  // ---- aim preview: dots along the path, a dashed band back to the start, and a big arrow
+  var dots = [];
+  for (var di = 0; di < 24; di++) { var dEl = document.createElement('i'); dEl.className = 'dot'; dEl.hidden = true; dotsEl.appendChild(dEl); dots.push(dEl); }
+  function hideAim() { aim.hidden = true; }
+  function hideDots(from) { for (var i = from || 0; i < dots.length; i++) dots[i].hidden = true; if (!from) hideAim(); }
+  function showAim(vx, vy, on) {
+    var L = Math.hypot(vx, vy), ux = vx / L, uy = vy / L, pull = L / K;
+    var x0 = s.x + ux * 44, y0 = s.y + uy * 44, len = 46 + pull * 0.9;
+    var x1 = x0 + ux * len, y1 = y0 + uy * len;
+    var bx = x1 - ux * 20, by = y1 - uy * 20, qx = -uy * 11, qy = ux * 11;
+    band.setAttribute('x1', HOME.x); band.setAttribute('y1', HOME.y);
+    band.setAttribute('x2', s.x.toFixed(1)); band.setAttribute('y2', s.y.toFixed(1));
+    aimLine.setAttribute('x1', x0.toFixed(1)); aimLine.setAttribute('y1', y0.toFixed(1));
+    aimLine.setAttribute('x2', bx.toFixed(1)); aimLine.setAttribute('y2', by.toFixed(1));
+    aimHead.setAttribute('d', 'M' + x1.toFixed(1) + ' ' + y1.toFixed(1) + ' L' + (bx + qx).toFixed(1) + ' ' + (by + qy).toFixed(1) + ' L' + (bx - qx).toFixed(1) + ' ' + (by - qy).toFixed(1) + ' Z');
+    aim.classList.toggle('on', !!on);
+    aim.hidden = false;
+  }
+  function drawPreview(vx, vy) {
+    if (Math.hypot(vx, vy) / K < 12) { hideDots(); return; }
+    var x = s.x, y = s.y, u = vx, v = vy, k = 0, onTarget = false;
+    for (var n = 0; n < 300; n++) {
+      u += accel(x, y, v) * DT; v += G * DT;
+      var py = y; x += u * DT; y += v * DT;
+      if (py < RIM_Y && y >= RIM_Y && Math.abs(x - CX) <= 35) onTarget = true;
+      if (n % 5 === 4 && k < dots.length) {
+        var d = dots[k];
+        d.hidden = false;
+        d.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px)';
+        d.style.opacity = (0.95 - k * 0.03).toFixed(2);
+        k++;
+      }
+      if (v > 0 && y > RIM_Y + 50) break;
+      if (x < 0 || x > WW) break;
+    }
+    hideDots(k);
+    showAim(vx, vy, onTarget);
+  }
+
+  // ---- launch / score / miss
+  function launch(vx, vy, guided) {
+    s.mode = 'flying'; s.guided = !!guided; s.vx = vx; s.vy = vy; s.t = 0; s.scored = false; s.onFloor = false; s.fading = false;
+    s.w = reduce ? 0 : (vx >= 0 ? 1 : -1) * (120 + Math.abs(vx) * 0.2);
+    fileEl.classList.remove('idle', 'enter', 'grab');
+    cap.style.opacity = 0; hideDots(); say('');
+  }
+  function autoShot() {
+    if (s.mode !== 'idle') return;
+    var apex = RIM_Y - 62, vy = -Math.sqrt(2 * G * (s.y - apex));
+    var T = -vy / G + Math.sqrt(2 * (RIM_Y - apex) / G);
+    launch((CX - s.x) / T, vy);
+  }
+  // guaranteed shot: a clean arc straight into the middle of the hoop
+  function dunk() {
+    if (s.mode !== 'idle') return;
+    var apex = RIM_Y - 90, vy = -Math.sqrt(2 * G * (s.y - apex));
+    var T = -vy / G + Math.sqrt(2 * (RIM_Y - apex) / G);
+    launch((CX - s.x) / T, vy, true);
+  }
+  function score() {
+    s.scored = true; s.settle = 0;
+    s.vx *= 0.2; s.vy = Math.max(s.vy * 0.55, 120);
+    fileEl.style.zIndex = '2';
+    zone.classList.add('hot');
+    swish(); popPlus();
+    var f = take();
+    addUpload(f);
+    say('Swish. ' + f.name + ' is uploading.');
+  }
+  function resetHome(withEnter) {
+    s.mode = 'idle'; s.x = HOME.x; s.y = HOME.y; s.vx = s.vy = 0; s.rot = 0; s.w = 0; s.scored = false;
+    fileEl.style.zIndex = '';
+    fileEl.classList.remove('gone', 'grab');
+    fileEl.classList.add('idle');
+    if (withEnter) fileEl.classList.add('enter');
+    setLabel(); cap.style.opacity = 1; render();
+  }
+  function finishScore() {
+    fileEl.classList.add('gone');
+    setTimeout(function () { zone.classList.remove('hot'); resetHome(true); }, 340);
+  }
+  function miss() {
+    zone.classList.remove('hot');
+    s.mode = 'returning'; s.rt = 0; s.fx = s.x; s.fy = s.y;
+    s.rot = ((s.rot + 180) % 360 + 360) % 360 - 180; s.fr = s.rot;
+    say('Off the rim. Pull back and shoot again.');
+  }
+
+  function update(dt) {
+    if (s.mode === 'flying') {
+      s.t += dt;
+      if (!s.scored) {
+        if (!s.guided) s.vx += accel(s.x, s.y, s.vy) * dt;
+        s.vy += G * dt;
+        var py = s.y;
+        s.x += s.vx * dt; s.y += s.vy * dt; s.rot += s.w * dt;
+        if (!s.guided) collide();
+        if (py < RIM_Y && s.y >= RIM_Y && s.vy > 0 && Math.abs(s.x - CX) <= 46) score();
+        if (!s.scored) {
+          if (s.x < R + 6) { s.x = R + 6; s.vx = Math.abs(s.vx) * 0.5; }
+          if (s.x > WW - R - 6) { s.x = WW - R - 6; s.vx = -Math.abs(s.vx) * 0.5; }
+          if (s.y > FLOOR) {
+            s.y = FLOOR; s.vy = -s.vy * 0.45; s.vx *= 0.78; s.w *= 0.7;
+            if (Math.abs(s.vy) < 90) { s.vy = 0; s.onFloor = true; }
+          }
+          if (s.onFloor) s.vx *= 0.97;
+          zone.classList.toggle('hot', s.x > 84 + ox && s.x < 316 + ox && s.y > 10 + oy && s.y < 170 + oy);
+          if ((s.onFloor && s.t > 0.4) || s.t > 3.5) miss();
+        }
+      } else {
+        s.vy = Math.min(s.vy + 700 * dt, 260); s.vx = 0;
+        s.x += (CX - s.x) * Math.min(1, 5 * dt);
+        s.y += s.vy * dt;
+        s.rot += (0 - s.rot) * Math.min(1, 4 * dt);
+        if (s.y >= REST_Y) {
+          s.y = REST_Y; s.vy = 0;
+          if (!s.fading) { s.fading = true; setTimeout(finishScore, 650); }
+        }
+      }
+      render();
+    } else if (s.mode === 'returning') {
+      s.rt += dt / 0.5;
+      var p = Math.min(1, s.rt), e = 1 - Math.pow(1 - p, 3);
+      s.x = s.fx + (HOME.x - s.fx) * e; s.y = s.fy + (HOME.y - s.fy) * e; s.rot = s.fr * (1 - e);
+      render();
+      if (p >= 1) resetHome(false);
+    }
+  }
+  var last = 0;
+  function frame(ts) {
+    var dt = Math.min(0.033, (ts - last) / 1000 || 0.016); last = ts;
+    update(dt);
+    requestAnimationFrame(frame);
+  }
+
+  // ---- pointer: pull back anywhere in the pull range, release to shoot
+  var drag = null;
+  function toWorld(e) {
+    var r = world.getBoundingClientRect();
+    return { x: (e.clientX - r.left) / hs, y: (e.clientY - r.top) / hs };
+  }
+  fileEl.addEventListener('pointerdown', function (e) {
+    if (s.mode !== 'idle') return;
+    e.preventDefault();
+    try { fileEl.setPointerCapture(e.pointerId); } catch (err) {}
+    drag = { id: e.pointerId };
+    s.mode = 'drag';
+    fileEl.classList.remove('idle', 'enter'); fileEl.classList.add('grab');
+    cap.style.opacity = 0;
+  });
+  fileEl.addEventListener('pointermove', function (e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    var p = toWorld(e), dx = p.x - HOME.x, dy = p.y - HOME.y, d = Math.hypot(dx, dy);
+    if (d > MAXPULL) { dx *= MAXPULL / d; dy *= MAXPULL / d; }
+    dy = Math.min(dy, HH - 24 - HOME.y);
+    s.x = HOME.x + dx; s.y = HOME.y + dy; s.rot = clamp(dx * 0.15, -20, 20);
+    render();
+    drawPreview(-dx * K, -dy * K);
+  });
+  function release(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag = null;
+    var dx = s.x - HOME.x, dy = s.y - HOME.y;
+    hideDots();
+    if (Math.hypot(dx, dy) < 16) { resetHome(false); return; }
+    launch(-dx * K, -dy * K);
+  }
+  fileEl.addEventListener('pointerup', release);
+  fileEl.addEventListener('pointercancel', release);
+  fileEl.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); autoShot(); }
+  });
+  $('auto').addEventListener('click', autoShot);
+  // ---- real files: drop anywhere on the page or browse
+  function hasFiles(e) {
+    var t = e.dataTransfer && e.dataTransfer.types;
+    return !!t && Array.prototype.indexOf.call(t, 'Files') >= 0;
+  }
+  stage.addEventListener('dragover', function (e) {
+    if (!hasFiles(e)) return;
+    e.preventDefault(); zone.classList.add('hot');
+  });
+  stage.addEventListener('dragleave', function (e) {
+    if (!e.relatedTarget || !stage.contains(e.relatedTarget)) zone.classList.remove('hot');
+  });
+  stage.addEventListener('drop', function (e) {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    var fs = Array.prototype.slice.call(e.dataTransfer.files);
+    if (s.mode !== 'flying') setTimeout(function () { zone.classList.remove('hot'); }, 500);
+    if (!fs.length) return;
+    fs.forEach(addUpload);
+    swish(); popPlus();
+    say(fs.length === 1 ? fs[0].name + ' dropped in.' : fs.length + ' files dropped in.');
+  });
+  window.addEventListener('dragover', function (e) { if (hasFiles(e)) e.preventDefault(); });
+  window.addEventListener('drop', function (e) { if (hasFiles(e)) e.preventDefault(); });
+
+  $('browse').addEventListener('click', function () { input.click(); });
+  input.addEventListener('change', function () {
+    var fs = Array.prototype.slice.call(input.files || []);
+    if (!fs.length) return;
+    fs.forEach(function (f) { queue.push({ name: f.name, size: f.size }); });
+    if (s.mode === 'idle') setLabel();
+    say(fs.length === 1 ? fs[0].name + ' is ready. Shoot it through the hoop.' : fs.length + ' files are ready. Shoot them one at a time.');
+    input.value = '';
+  });
+
+  if (window.ResizeObserver) { var ro = new ResizeObserver(layout); ro.observe(stage); ro.observe(head); }
+  else window.addEventListener('resize', layout);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout);
+
+  setLabel(); layout(); render();
+  requestAnimationFrame(frame);
+})();
+</script>
+
+</body></html>
