@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Designer Coder Hero</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F2F4F7;
+    --ink: #141B26;
+    --muted: #4A5565;
+    --blue: #2F5BEA;
+    --font-display: 'Outfit', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-display);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 48px max(24px, 4vw);
+    overflow-x: hidden;
+    touch-action: pan-y;
+  }
+
+  /* ---------- hero ----------
+     JS sets these on .hero from the mouse position:
+     --s     where the split sits, 0 to 100 (50 = centre)
+     --lv    how much of the designer text is visible, 0 to 1
+     --rv    how much of the coder text is visible, 0 to 1
+     --grow  how far the portrait has grown, 0 to 1 */
+  .hero {
+    --s: 50;
+    --lv: 1;
+    --rv: 1;
+    --grow: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    max-width: 1280px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  .col {
+    flex-basis: 0;
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding-bottom: 6px;
+  }
+  .col.left  { flex-grow: var(--lv); opacity: var(--lv); text-align: right; align-items: flex-end; }
+  .col.right { flex-grow: var(--rv); opacity: var(--rv); text-align: left;  align-items: flex-start; }
+  h2 {
+    margin: 0;
+    font-size: clamp(40px, 5.4vw, 96px);
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1.05;
+    white-space: nowrap;
+  }
+  .col p {
+    margin: 0;
+    font-size: 18px;
+    line-height: 1.55;
+    color: var(--muted);
+    max-width: 300px;
+  }
+
+  /* ---------- portrait: two full faces, each clipped at the split ---------- */
+  .portrait {
+    flex-grow: 0;
+    flex-shrink: 1;
+    flex-basis: calc(
+      clamp(320px, 38vw, 520px) +
+      (clamp(360px, 52vw, 720px) - clamp(320px, 38vw, 520px)) * var(--grow)
+    );
+    min-width: 0;
+  }
+  .stage { position: relative; width: 100%; aspect-ratio: 580 / 520; }
+  .layer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .layer.a { clip-path: inset(0 calc(100% - var(--s) * 1%) 0 0); }
+  .layer.b { clip-path: inset(0 0 0 calc(var(--s) * 1%)); }
+
+  .hint {
+    text-align: center;
+    margin: 24px 0 0;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  /* ---------- phone / narrow: stack, portrait first ---------- */
+  @media (max-width: 900px) {
+    .hero { flex-direction: column; align-items: stretch; gap: 16px; }
+    .portrait { order: -1; flex: 0 0 auto; width: 100%; max-width: 560px; margin: 0 auto; }
+    .col.left { text-align: left; align-items: flex-start; }
+    h2 { font-size: clamp(48px, 14vw, 96px); }
+  }
+</style>
+</head>
+<body>
+
+<!-- shared drawing pieces -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <clipPath id="fig">
+      <path d="M10 520 C20 455 100 425 160 410 L240 410 C300 425 380 455 390 520 Z"/>
+      <path d="M170 330 L230 330 L238 415 L162 415 Z"/>
+      <path d="M200 60 C275 60 305 120 300 200 C296 270 255 335 200 345 C145 335 104 270 100 200 C95 120 125 60 200 60 Z"/>
+    </clipPath>
+    <pattern id="dots" width="6" height="6" patternUnits="userSpaceOnUse">
+      <circle cx="3" cy="3" r="1.3" fill="#141B26" opacity="0.28"/>
+    </pattern>
+
+    <!-- paint strokes that spill outside the figure -->
+    <g id="spill">
+      <rect x="-70" y="395" width="150" height="40" rx="20" fill="#FF7A3D" opacity="0.85" transform="rotate(-12 0 415)"/>
+      <rect x="-80" y="445" width="170" height="34" rx="17" fill="#3CCFA6" opacity="0.85" transform="rotate(8 0 460)"/>
+      <rect x="-40" y="350" width="110" height="30" rx="15" fill="#2F5BEA" opacity="0.7" transform="rotate(-20 10 365)"/>
+      <rect x="-20" y="485" width="140" height="26" rx="13" fill="#F6B8C8" opacity="0.9" transform="rotate(-6 50 498)"/>
+    </g>
+
+    <!-- paint strokes inside the figure -->
+    <g id="strokes">
+      <rect x="85" y="110" width="150" height="46" rx="23" fill="#2F5BEA" transform="rotate(-18 150 133)"/>
+      <rect x="95" y="160" width="130" height="40" rx="20" fill="#FF7A3D" transform="rotate(12 160 180)"/>
+      <rect x="88" y="208" width="140" height="44" rx="22" fill="#3CCFA6" transform="rotate(-8 158 230)"/>
+      <rect x="104" y="262" width="110" height="36" rx="18" fill="#F6B8C8" transform="rotate(16 159 280)"/>
+      <rect x="96" y="304" width="120" height="30" rx="15" fill="#2F5BEA" opacity="0.8" transform="rotate(-10 156 319)"/>
+      <rect x="100" y="345" width="130" height="64" rx="28" fill="#3CCFA6" transform="rotate(-20 165 377)"/>
+      <rect x="40" y="410" width="190" height="50" rx="25" fill="#2F5BEA" transform="rotate(-10 135 435)"/>
+      <rect x="0" y="462" width="230" height="60" rx="30" fill="#FF7A3D" transform="rotate(8 115 492)"/>
+      <rect x="110" y="140" width="90" height="8" rx="4" fill="#FFFFFF" opacity="0.45" transform="rotate(-18 155 144)"/>
+      <rect x="105" y="236" width="100" height="8" rx="4" fill="#FFFFFF" opacity="0.5" transform="rotate(-8 155 240)"/>
+      <rect x="60" y="440" width="150" height="8" rx="4" fill="#FFFFFF" opacity="0.4" transform="rotate(-10 135 444)"/>
+    </g>
+
+    <!-- hair and face, shared by both layers -->
+    <g id="face">
+      <path d="M105 190 C90 100 130 30 200 28 C275 30 315 100 297 190 C285 140 250 110 200 108 C150 110 115 140 105 190 Z" fill="#141B26"/>
+      <path d="M110 80 L128 40 L146 70 L168 26 L186 62 L204 24 L222 62 L246 28 L262 66 L284 44 L292 96 C270 50 130 50 110 80 Z" fill="#141B26"/>
+      <path d="M138 178 Q158 166 182 176" fill="none" stroke="#141B26" stroke-width="6" stroke-linecap="round"/>
+      <path d="M218 176 Q242 166 262 178" fill="none" stroke="#141B26" stroke-width="6" stroke-linecap="round"/>
+      <ellipse cx="158" cy="202" rx="13" ry="8" fill="#FFFFFF" stroke="#141B26" stroke-width="3"/>
+      <circle cx="161" cy="201" r="5" fill="#141B26"/>
+      <ellipse cx="242" cy="202" rx="13" ry="8" fill="#FFFFFF" stroke="#141B26" stroke-width="3"/>
+      <circle cx="247" cy="199" r="5" fill="#141B26"/>
+      <path d="M200 206 L193 255 Q200 263 211 256" fill="none" stroke="#141B26" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M174 294 Q200 306 226 290" fill="none" stroke="#141B26" stroke-width="4" stroke-linecap="round"/>
+    </g>
+  </defs>
+</svg>
+
+<main>
+  <section class="hero" id="hero">
+
+    <div class="col left">
+      <h2>designer</h2>
+      <p>Product designer shaping interfaces, brand systems and the small details between screens.</p>
+    </div>
+
+    <div class="portrait">
+      <div class="stage" role="img" aria-label="Illustrated portrait. The left half is painted with colourful brush strokes, the right half is drawn in grey halftone with code. Moving the mouse left or right slowly reveals one side in full.">
+
+        <!-- painted face -->
+        <svg class="layer a" viewBox="-90 0 580 520" aria-hidden="true" focusable="false">
+          <use href="#spill"/>
+          <use href="#spill" transform="translate(400 0) scale(-1 1)"/>
+          <g clip-path="url(#fig)">
+            <rect x="-90" y="0" width="580" height="520" fill="#F1E8DA"/>
+            <use href="#strokes"/>
+            <use href="#strokes" transform="translate(400 0) scale(-1 1)"/>
+          </g>
+          <use href="#face"/>
+        </svg>
+
+        <!-- coder face -->
+        <svg class="layer b" viewBox="-90 0 580 520" aria-hidden="true" focusable="false">
+          <path d="M10 520 C20 455 100 425 160 410 L240 410 C300 425 380 455 390 520 Z" fill="#EEEAE2"/>
+          <path d="M170 330 L230 330 L238 415 L162 415 Z" fill="#BFB09C"/>
+          <path d="M200 60 C275 60 305 120 300 200 C296 270 255 335 200 345 C145 335 104 270 100 200 C95 120 125 60 200 60 Z" fill="#D6C8B5"/>
+          <path d="M200 60 C275 60 305 120 300 200 C296 270 255 335 200 345 C145 335 104 270 100 200 C95 120 125 60 200 60 Z" fill="url(#dots)"/>
+          <g font-family="'JetBrains Mono', ui-monospace, monospace" font-size="11" fill="#141B26" opacity="0.6">
+            <text x="214" y="440">const hero = {</text>
+            <text x="226" y="458">role: &quot;coder&quot;,</text>
+            <text x="226" y="476">fast: true,</text>
+            <text x="226" y="494">a11y: &quot;AA&quot;,</text>
+            <text x="214" y="512">};</text>
+            <text x="80" y="440">body {</text>
+            <text x="92" y="458">margin: 0;</text>
+            <text x="92" y="476">font: Outfit;</text>
+            <text x="92" y="494">color: ink;</text>
+            <text x="80" y="512">}</text>
+          </g>
+          <use href="#face"/>
+          <g font-family="'JetBrains Mono', ui-monospace, monospace" font-size="13" fill="#141B26">
+            <text x="318" y="372" opacity="0.18">&lt;main&gt;</text>
+            <text x="318" y="392" opacity="0.28">.hero {</text>
+            <text x="330" y="412" opacity="0.38">display: grid;</text>
+            <text x="330" y="432" opacity="0.28">gap: 24px;</text>
+            <text x="318" y="452" opacity="0.2">}</text>
+            <text x="318" y="476" opacity="0.14">flex-wrap</text>
+            <text x="-78" y="372" opacity="0.18">&lt;header&gt;</text>
+            <text x="-78" y="392" opacity="0.28">.logo {</text>
+            <text x="-66" y="412" opacity="0.38">width: 48px;</text>
+            <text x="-66" y="432" opacity="0.28">fill: #000;</text>
+            <text x="-78" y="452" opacity="0.2">}</text>
+            <text x="-78" y="476" opacity="0.14">grid-area</text>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <div class="col right">
+      <h2>&lt;coder&gt;</h2>
+      <p>Front-end developer building fast, accessible interfaces with tidy, readable code.</p>
+    </div>
+
+  </section>
+
+  <p class="hint">Move your mouse left or right, or use the arrow keys</p>
+</main>
+
+<script>
+  (function () {
+    var hero = document.getElementById('hero');
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    var target = 50;   // where the split wants to be (0 to 100)
+    var current = 50;  // where it is now, eased toward the target
+    var EASE = reduce ? 1 : 0.06;  // lower is slower
+    var running = false;
+
+    function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+
+    function paint() {
+      var s = current;
+      hero.style.setProperty('--s', s.toFixed(2));
+      hero.style.setProperty('--lv', clamp(s / 50, 0, 1).toFixed(3));
+      hero.style.setProperty('--rv', clamp((100 - s) / 50, 0, 1).toFixed(3));
+      hero.style.setProperty('--grow', (Math.abs(s - 50) / 50).toFixed(3));
+    }
+
+    function tick() {
+      var diff = target - current;
+      if (Math.abs(diff) < 0.02) {
+        current = target;
+        paint();
+        running = false;
+        return;
+      }
+      current += diff * EASE;
+      paint();
+      requestAnimationFrame(tick);
+    }
+
+    function setTarget(v) {
+      target = clamp(v, 0, 100);
+      if (!running) { running = true; requestAnimationFrame(tick); }
+    }
+
+    function fromX(x) {
+      var t = (x / window.innerWidth - 0.5) * 2;       // -1 at left edge, 1 at right edge
+      setTarget(50 - 50 * clamp(t * 1.15, -1, 1));     // mouse left = more designer, mouse right = more coder
+    }
+
+    window.addEventListener('pointermove', function (e) { fromX(e.clientX); });
+    window.addEventListener('pointerdown', function (e) { fromX(e.clientX); });
+    document.documentElement.addEventListener('pointerleave', function () { setTarget(50); });
+
+    window.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowLeft')  { setTarget(target + 12); }
+      if (e.key === 'ArrowRight') { setTarget(target - 12); }
+      if (e.key === 'Home' || e.key === 'Escape') { setTarget(50); }
+    });
+
+    paint();
+  })();
+</script>
+
+</body>
+</html>
