@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Power Rocker Switch</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500&display=swap" rel="stylesheet">
+  <style>
+    /* ---------- Design tokens ---------- */
+    :root {
+      --hue: 223;
+      --ease: cubic-bezier(0.65, 0, 0.35, 1);
+      --dur: 0.3s;
+
+      --bg: hsl(var(--hue) 10% 90%);
+      --fg: hsl(var(--hue) 10% 10%);
+      --muted: hsl(var(--hue) 10% 60%);
+      --focus: hsl(var(--hue) 90% 50%);
+      --face: hsl(var(--hue) 10% 90%);
+      --face-rim: hsl(0 0% 100%);
+      --face-glow: hsl(var(--hue) 10% 80%);
+      --well-top: hsl(var(--hue) 10% 65%);
+      --well-bottom: hsl(var(--hue) 10% 87.5%);
+      --well-depth: hsl(var(--hue) 10% 70%);
+      --sep: hsl(var(--hue) 10% 75%);
+      --sep-hi: hsl(0 0% 100%);
+      --emboss-dark: hsl(var(--hue) 10% 40%);
+      --emboss-light: hsl(0 0% 100%);
+      --cast: hsl(var(--hue) 10% 10% / 0.7);
+
+      font-size: clamp(60px, calc(60px + 60 * (100vw - 280px) / 3560), 120px);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: hsl(var(--hue) 10% 30%);
+        --fg: hsl(var(--hue) 10% 90%);
+        --muted: hsl(var(--hue) 10% 20%);
+        --focus: hsl(var(--hue) 90% 70%);
+        --face: hsl(var(--hue) 10% 30%);
+        --face-rim: hsl(var(--hue) 10% 50%);
+        --face-glow: hsl(var(--hue) 10% 20%);
+        --well-top: hsl(var(--hue) 10% 5%);
+        --well-bottom: hsl(var(--hue) 10% 27.5%);
+        --well-depth: hsl(var(--hue) 10% 20%);
+        --sep: hsl(var(--hue) 10% 20%);
+        --sep-hi: hsl(var(--hue) 10% 50%);
+        --emboss-dark: hsl(var(--hue) 10% 10%);
+        --emboss-light: hsl(var(--hue) 10% 50%);
+        --cast: hsl(var(--hue) 10% 10% / 0.9);
+      }
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+      min-height: 100dvh;
+      background: var(--bg);
+      color: var(--fg);
+      font: 500 1em/1.5 "DM Sans", system-ui, sans-serif;
+      transition: background-color var(--dur), color var(--dur);
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    /* ---------- Rocker ----------
+       All state differences live in these custom properties,
+       so the "on" rule below is just a set of value swaps. */
+    .rocker {
+      --tilt: 15deg;
+      --shift: 0.125rem;
+      --pit-on: 0;
+      --pit-off: 1;
+      --ink-on: var(--muted);
+      --ink-off: var(--fg);
+      --ring: 0 0 0 0.125em var(--cast);
+      --blur: 0 0 0.25em 0.125em var(--cast);
+      --cast-on: var(--blur);
+      --cast-off: var(--ring);
+      --rot-on: -7.5deg;
+      --rot-off: 0deg;
+
+      position: relative;
+      display: block;
+      width: 3.1875em;
+      height: 1.5em;
+      border-radius: 0.75em;
+      background: transparent;
+      font: inherit;
+      color: inherit;
+      cursor: pointer;
+      appearance: none;
+      outline: none;
+      isolation: isolate;
+      -webkit-tap-highlight-color: transparent;
+      box-shadow:
+        0 0 0 0.125em transparent,
+        0 0.0625em 0.0625em var(--well-top) inset,
+        0 -0.0625em 0.0625em var(--well-bottom) inset,
+        0 0.25em 0.25em var(--well-depth) inset;
+      transition: box-shadow var(--dur);
+    }
+
+    .rocker[aria-checked="true"] {
+      --tilt: -15deg;
+      --shift: -0.125rem;
+      --pit-on: 1;
+      --pit-off: 0;
+      --ink-on: var(--fg);
+      --ink-off: var(--muted);
+      --cast-on: var(--ring);
+      --cast-off: var(--blur);
+      --rot-on: 0deg;
+      --rot-off: 7.5deg;
+    }
+
+    .rocker:focus-visible {
+      box-shadow:
+        0 0 0 0.125em var(--focus),
+        0 0.0625em 0.0625em var(--well-top) inset,
+        0 -0.0625em 0.0625em var(--well-bottom) inset,
+        0 0.25em 0.25em var(--well-depth) inset;
+    }
+
+    /* Contact shadows cast by the paddle onto the housing */
+    .rocker__cast {
+      position: absolute;
+      top: 0.375em;
+      width: 1.25em;
+      height: 0.75em;
+      z-index: -1;
+      transition:
+        box-shadow var(--dur) var(--ease),
+        transform var(--dur) var(--ease);
+    }
+
+    .rocker__cast--on {
+      left: 0.375em;
+      border-radius: 0.375em 0.875em 0.375em 0.375em / 0.375em 0.625em 0.125em 0.375em;
+      box-shadow: var(--cast-on);
+      transform: rotate(var(--rot-on));
+      transform-origin: 1em 0.375em;
+    }
+
+    .rocker__cast--off {
+      right: 0.375em;
+      border-radius: 0.875em 0.375em 0.375em 0.375em / 0.625em 0.375em 0.375em 0.125em;
+      box-shadow: var(--cast-off);
+      transform: rotate(var(--rot-off));
+      transform-origin: 0.5em 0.375em;
+    }
+
+    /* The housing the paddle sits in */
+    .rocker__bezel {
+      position: absolute;
+      inset: 0.25em;
+      border-radius: 0.5em;
+      background: var(--face);
+      box-shadow: 0 -0.125em 0.25em var(--face-glow) inset;
+      perspective: 20em;
+      transition: background-color var(--dur), box-shadow var(--dur);
+    }
+
+    /* The paddle itself — tilts toward the pressed side */
+    .rocker__paddle {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      justify-content: space-around;
+      border-radius: inherit;
+      background: var(--face);
+      box-shadow: 0 0 1px var(--face-rim) inset;
+      font-size: 0.5em;
+      line-height: 2;
+      transform: translateX(var(--shift)) rotateY(var(--tilt));
+      transition:
+        background-color var(--dur),
+        box-shadow var(--dur),
+        transform var(--dur) var(--ease);
+    }
+
+    /* Inner "pit" shading on the side that is pushed in */
+    .rocker__paddle::before,
+    .rocker__paddle::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      width: 45%;
+      height: 100%;
+      transition: opacity var(--dur) var(--ease);
+    }
+
+    .rocker__paddle::before {
+      left: 0;
+      border-radius: 0.5rem 0 0 0.5rem;
+      box-shadow:
+        0 1px 0.0625rem hsl(var(--hue) 10% 10% / 0.7) inset,
+        0.125rem 0.25rem 0.25rem hsl(var(--hue) 10% 10% / 0.3) inset;
+      mask-image: linear-gradient(-90deg, transparent, #000);
+      opacity: var(--pit-on);
+    }
+
+    .rocker__paddle::after {
+      right: 0;
+      border-radius: 0 0.5rem 0.5rem 0;
+      box-shadow:
+        0 1px 0.0625rem hsl(var(--hue) 10% 10% / 0.7) inset,
+        -0.125rem 0.25rem 0.25rem hsl(var(--hue) 10% 10% / 0.3) inset;
+      mask-image: linear-gradient(90deg, transparent, #000);
+      opacity: var(--pit-off);
+    }
+
+    .rocker__mark {
+      width: 100%;
+      text-align: center;
+      text-shadow:
+        0 -1px 0 var(--emboss-dark),
+        0 1px 0 var(--emboss-light);
+      transition: color var(--dur), text-shadow var(--dur);
+    }
+
+    .rocker__mark--on  { color: var(--ink-on); }
+    .rocker__mark--off { color: var(--ink-off); }
+
+    /* Draw the IEC power glyphs with CSS so they stay crisp at any size */
+    .rocker__glyph {
+      display: inline-block;
+      vertical-align: middle;
+    }
+
+    .rocker__mark--on .rocker__glyph {
+      width: 0.14em;
+      height: 0.8em;
+      border-radius: 0.07em;
+      background: currentColor;
+    }
+
+    .rocker__mark--off .rocker__glyph {
+      width: 0.72em;
+      height: 0.72em;
+      border: 0.14em solid currentColor;
+      border-radius: 50%;
+    }
+
+    /* Emboss the drawn glyphs to match the text-shadow treatment */
+    .rocker__glyph {
+      filter:
+        drop-shadow(0 -1px 0 var(--emboss-dark))
+        drop-shadow(0 1px 0 var(--emboss-light));
+    }
+
+    .rocker__sep {
+      width: 1px;
+      min-width: 1px;
+      height: 0.75rem;
+      margin: auto 0;
+      background: var(--sep);
+      box-shadow: 1px 0 0 var(--sep-hi);
+      transition: background-color var(--dur), box-shadow var(--dur);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      :root { --dur: 0.01s; }
+    }
+  </style>
+</head>
+<body>
+  <div class="power">
+    <span class="sr-only" id="power-label">Power</span>
+    <button
+      class="rocker"
+      type="button"
+      role="switch"
+      aria-checked="false"
+      aria-labelledby="power-label"
+      data-rocker
+    >
+      <span class="rocker__cast rocker__cast--on" aria-hidden="true"></span>
+      <span class="rocker__cast rocker__cast--off" aria-hidden="true"></span>
+      <span class="rocker__bezel" aria-hidden="true">
+        <span class="rocker__paddle">
+          <span class="rocker__mark rocker__mark--on"><span class="rocker__glyph"></span></span>
+          <span class="rocker__sep"></span>
+          <span class="rocker__mark rocker__mark--off"><span class="rocker__glyph"></span></span>
+        </span>
+      </span>
+    </button>
+  </div>
+
+  <script>
+    /**
+     * Two-position rocker switch.
+     * - Uses role="switch" + aria-checked, so assistive tech announces "Power, switch, on/off".
+     * - Click, Space/Enter (native button), or ←/→ to press a specific side.
+     * - Emits a bubbling "rocker:change" event with { checked }.
+     */
+    class Rocker {
+      #el;
+
+      constructor(el, { checked = false } = {}) {
+        this.#el = el;
+        this.#el.addEventListener("click", () => this.toggle());
+        this.#el.addEventListener("keydown", (e) => this.#onKey(e));
+        this.#apply(checked, false);
+      }
+
+      get checked() {
+        return this.#el.getAttribute("aria-checked") === "true";
+      }
+
+      set checked(value) {
+        this.#apply(Boolean(value), true);
+      }
+
+      toggle() {
+        this.checked = !this.checked;
+      }
+
+      #onKey(e) {
+        // Left side is "I" (on), right side is "O" (off)
+        const map = { ArrowLeft: true, ArrowRight: false };
+        if (!(e.key in map)) return;
+        e.preventDefault();
+        this.checked = map[e.key];
+      }
+
+      #apply(next, notify) {
+        if (notify && next === this.checked) return;
+        this.#el.setAttribute("aria-checked", String(next));
+        if (notify) {
+          this.#el.dispatchEvent(
+            new CustomEvent("rocker:change", { bubbles: true, detail: { checked: next } })
+          );
+        }
+      }
+    }
+
+    document.querySelectorAll("[data-rocker]").forEach((el) => new Rocker(el));
+
+    document.addEventListener("rocker:change", (e) => {
+      console.log(`Power ${e.detail.checked ? "on" : "off"}`);
+    });
+  </script>
+</body>
+</html>
